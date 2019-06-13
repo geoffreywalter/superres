@@ -1,0 +1,4 @@
+[default]
+entity: gwalter
+project: superres
+base_url: https://api.wandb.ai
