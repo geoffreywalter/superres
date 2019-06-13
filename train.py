@@ -10,7 +10,13 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback
 import wandb
 from wandb.keras import WandbCallback
-#test git
+
+#GPU config
+import tensorflow as tf
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+session = tf.Session(config=config)
+
 run = wandb.init(project='superres')
 config = run.config
 
