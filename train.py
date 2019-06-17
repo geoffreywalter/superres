@@ -4,15 +4,18 @@ import subprocess
 import os
 from PIL import Image
 import numpy as np
-from tensorflow.keras.models import Sequential
+import tensorflow as tf
+from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback
 import wandb
 from wandb.keras import WandbCallback
+from helpfunc import PS, perceptual_distance
+
 
 #GPU config
-import tensorflow as tf
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
 session = tf.Session(config=config)
@@ -41,6 +44,19 @@ config.steps_per_epoch = len(
 config.val_steps_per_epoch = len(
     glob.glob(val_dir + "/*-in.jpg")) // config.batch_size
 
+class ImageLogger(Callback):
+    def on_epoch_end(self, epoch, logs):
+        in_sample_images, out_sample_images = next(image_generator(config.batch_size, val_dir))
+        preds = self.model.predict(in_sample_images)
+        in_resized = []
+        # Simple upsampling
+        for arr in in_sample_images:
+            in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+        test_img = np.zeros(
+            (config.output_width, config.output_height, 3))
+        wandb.log({
+            "examples": [wandb.Image(np.concatenate([in_resized[i] * 255, o * 255, out_sample_images[i] * 255], axis=1)) for i, o in enumerate(preds)]
+        }, commit=False)
 
 def image_generator(batch_size, img_dir):
     """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
@@ -62,47 +78,31 @@ def image_generator(batch_size, img_dir):
         yield (small_images, large_images)
         counter += batch_size
 
+#base_model = tf.keras.applications.ResNet50(include_top=False, weights=None, input_tensor=None, input_shape=[32, 32, 3], pooling=None)
+# model = Sequential()
+# model.add(layers.Conv2D(64, (5, 5), activation='relu', padding='same',
+                         # input_shape=(config.input_width, config.input_height, 3)))
+# model.add(layers.Conv2D(32, (3, 3), activation='relu', padding='same'))
+# model.add(layers.Conv2D(3*8², (3, 3), activation='relu', padding='same'))
+input1 = Input(shape=(32, 32, 3), dtype='float32')
 
-def perceptual_distance(y_true, y_pred):
-    """Calculate perceptual distance, DO NOT ALTER"""
-    y_true *= 255
-    y_pred *= 255
-    rmean = (y_true[:, :, :, 0] + y_pred[:, :, :, 0]) / 2
-    r = y_true[:, :, :, 0] - y_pred[:, :, :, 0]
-    g = y_true[:, :, :, 1] - y_pred[:, :, :, 1]
-    b = y_true[:, :, :, 2] - y_pred[:, :, :, 2]
+conv1 = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
+conv2 = Conv2D(32, (3, 3), activation='relu', padding='same') (conv1)
+conv3 = Conv2D(3*8*8, (3, 3), activation='relu', padding='same') (conv2) 
+lam = Lambda(lambda x: PS(x, 8))(conv3)
+final = Activation('tanh')(lam)
 
-    return K.mean(K.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
-
-
-val_generator = image_generator(config.batch_size, val_dir)
-in_sample_images, out_sample_images = next(val_generator)
-
-
-class ImageLogger(Callback):
-    def on_epoch_end(self, epoch, logs):
-        preds = self.model.predict(in_sample_images)
-        in_resized = []
-        for arr in in_sample_images:
-            # Simple upsampling
-            in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
-        wandb.log({
-            "examples": [wandb.Image(np.concatenate([in_resized[i] * 255, o * 255, out_sample_images[i] * 255], axis=1)) for i, o in enumerate(preds)]
-        }, commit=False)
+model = Model(inputs=input1, outputs=final)
+print(model.summary())
 
 
-model = Sequential()
-model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same',
-                        input_shape=(config.input_width, config.input_height, 3)))
-model.add(layers.UpSampling2D())
-model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
-model.add(layers.UpSampling2D())
-model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
-model.add(layers.UpSampling2D())
-model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
+# model.add(layers.UpSampling2D())
+# model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
+# model.add(layers.UpSampling2D())
+# model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
 
 # DONT ALTER metrics=[perceptual_distance]
-model.compile(optimizer='adam', loss='mse',
+model.compile(optimizer='adam', loss=perceptual_distance,
               metrics=[perceptual_distance])
 
 model.fit_generator(image_generator(config.batch_size, train_dir),
@@ -110,4 +110,4 @@ model.fit_generator(image_generator(config.batch_size, train_dir),
                     epochs=config.num_epochs, callbacks=[
                         ImageLogger(), WandbCallback()],
                     validation_steps=config.val_steps_per_epoch,
-                    validation_data=val_generator)
+                    validation_data=image_generator(config.batch_size, val_dir))
