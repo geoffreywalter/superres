@@ -10,6 +10,7 @@ from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import wandb
 from wandb.keras import WandbCallback
 from helpfunc import PS, perceptual_distance
@@ -58,7 +59,7 @@ class ImageLogger(Callback):
             "examples": [wandb.Image(np.concatenate([in_resized[i] * 255, o * 255, out_sample_images[i] * 255], axis=1)) for i, o in enumerate(preds)]
         }, commit=False)
 
-def image_generator(batch_size, img_dir):
+def image_generator(batch_size, img_dir, augment=True):
     """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
     input_filenames = glob.glob(img_dir + "/*-in.jpg")
     counter = 0
@@ -75,7 +76,30 @@ def image_generator(batch_size, img_dir):
             small_images[i] = np.array(Image.open(img)) / 255.0
             large_images[i] = np.array(
                 Image.open(img.replace("-in.jpg", "-out.jpg"))) / 255.0
-        yield (small_images, large_images)
+
+        if (img_dir == train_dir and augment):
+            #Data augmentation
+            data_gen_args = dict(#featurewise_center=True,
+                        #featurewise_std_normalization=True,
+                        #zca_whitening=True,
+                        rotation_range=90,
+                        width_shift_range=0.2,
+                        height_shift_range=0.2,
+                        vertical_flip=True,
+                        shear_range=0.2,
+                        zoom_range=0.2)
+            image_datagen = ImageDataGenerator(**data_gen_args)
+
+            seed = counter
+            image_datagen.fit(small_images, augment=True, seed=seed)
+            gen1 = image_datagen.flow(small_images, batch_size=config.batch_size, shuffle=False, seed=seed)
+            gen2 = image_datagen.flow(large_images, batch_size=config.batch_size, shuffle=False, seed=seed)
+            gen = zip(gen1, gen2)
+
+            small_images_augmented, large_images_augmented = next(gen)
+            yield (small_images_augmented, large_images_augmented)
+        else:
+            yield (small_images, large_images)
         counter += batch_size
 
 #base_model = tf.keras.applications.ResNet50(include_top=False, weights=None, input_tensor=None, input_shape=[32, 32, 3], pooling=None)
@@ -102,7 +126,7 @@ print(model.summary())
 # model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
 
 # DONT ALTER metrics=[perceptual_distance]
-model.compile(optimizer='adam', loss=perceptual_distance,
+model.compile(optimizer='adam', loss='mse',
               metrics=[perceptual_distance])
 
 model.fit_generator(image_generator(config.batch_size, train_dir),
