@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -82,11 +82,11 @@ def image_generator(batch_size, img_dir, augment=True):
             data_gen_args = dict(#featurewise_center=True,
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
-                        rotation_range=90,
+                        #rotation_range=90,
                         width_shift_range=0.2,
                         height_shift_range=0.2,
                         vertical_flip=True,
-                        shear_range=0.2,
+                        #shear_range=0.2,
                         zoom_range=0.2)
             image_datagen = ImageDataGenerator(**data_gen_args)
 
@@ -108,15 +108,40 @@ def image_generator(batch_size, img_dir, augment=True):
                          # input_shape=(config.input_width, config.input_height, 3)))
 # model.add(layers.Conv2D(32, (3, 3), activation='relu', padding='same'))
 # model.add(layers.Conv2D(3*8², (3, 3), activation='relu', padding='same'))
+
+def resBlock(tens, filter_size):
+    x = Conv2D(filter_size, (3, 3), padding='same') (tens)
+    x = BatchNormalization()(x)
+    x = Activation('relu')(x)
+    x = Conv2D(filter_size, (3, 3), padding='same') (x)
+    x = BatchNormalization()(x)
+    x = Add()([x, tens])
+    x = Activation('relu')(x)
+    return x
+
 input1 = Input(shape=(32, 32, 3), dtype='float32')
 
-conv1 = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
-conv2 = Conv2D(32, (3, 3), activation='relu', padding='same') (conv1)
-conv3 = Conv2D(3*8*8, (3, 3), activation='relu', padding='same') (conv2) 
-lam = Lambda(lambda x: PS(x, 8))(conv3)
-final = Activation('tanh')(lam)
+# x = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
+# x = Conv2D(32, (3, 3), activation='relu', padding='same') (x)
+x = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
+x = resBlock(x, 64)
+x = resBlock(x, 64)
+x = resBlock(x, 64)
+x = resBlock(x, 64)
+x = resBlock(x, 64)
+x = resBlock(x, 64)
 
-model = Model(inputs=input1, outputs=final)
+x = Conv2D(128, (3, 3), activation='relu', padding='same') (x)
+x = resBlock(x, 128)
+x = resBlock(x, 128)
+x = resBlock(x, 128)
+x = resBlock(x, 128)
+
+x = Conv2D(3*8*8, (3, 3), activation='relu', padding='same') (x) 
+x = Lambda(lambda x: PS(x, 8))(x)
+out = Activation('tanh')(x)
+
+model = Model(inputs=input1, outputs=out)
 print(model.summary())
 
 
