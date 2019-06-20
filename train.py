@@ -121,34 +121,34 @@ def resBlock(tens, filter_size):
 
 input1 = Input(shape=(32, 32, 3), dtype='float32')
 
-# x = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
-# x = Conv2D(32, (3, 3), activation='relu', padding='same') (x)
 x = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
-x = resBlock(x, 64)
-x = resBlock(x, 64)
-x = resBlock(x, 64)
-x = resBlock(x, 64)
-x = resBlock(x, 64)
-x = resBlock(x, 64)
+temp = x
 
-x = Conv2D(128, (3, 3), activation='relu', padding='same') (x)
-x = resBlock(x, 128)
-x = resBlock(x, 128)
-x = resBlock(x, 128)
-x = resBlock(x, 128)
+# Resnet layers
+for i in range(16):
+    x = resBlock(x, 64)
 
-x = Conv2D(3*8*8, (3, 3), activation='relu', padding='same') (x) 
-x = Lambda(lambda x: PS(x, 8))(x)
-out = Activation('tanh')(x)
+x = Conv2D(64, (3, 3), activation='relu', padding='same') (x) 
+x = BatchNormalization()(x)
+x = Add()([temp, x])
 
-model = Model(inputs=input1, outputs=out)
+# Sub-pixel convolution layer 1
+r = 4
+x = Conv2D(3*r*r, (3, 3), activation='relu', padding='same') (x) 
+x = Lambda(lambda x: PS(x, r))(x)
+x = Activation('tanh')(x)
+
+x = Conv2D(128, (3, 3), activation='relu', padding='same') (x) 
+# Sub-pixel convolution layer 2
+r = 2
+x = Conv2D(3*r*r, (3, 3), activation='relu', padding='same') (x) 
+x = Lambda(lambda x: PS(x, r))(x)
+x = Activation('tanh')(x)
+
+x = Conv2D(3, (9, 9), activation='relu', padding='same') (x) 
+
+model = Model(inputs=input1, outputs=x)
 print(model.summary())
-
-
-# model.add(layers.UpSampling2D())
-# model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
-# model.add(layers.UpSampling2D())
-# model.add(layers.Conv2D(3, (3, 3), activation='relu', padding='same'))
 
 # DONT ALTER metrics=[perceptual_distance]
 model.compile(optimizer='adam', loss='mse',
