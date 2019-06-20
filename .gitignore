@@ -2,4 +2,4 @@ data/*
 wandb/*
 requirements*
 wandb/settings
-__pycache/*
+__pycache__/*
