@@ -119,10 +119,10 @@ def resBlock(tens, filter_size):
     x = Activation('relu')(x)
     return x
 
-input1 = Input(shape=(32, 32, 3), dtype='float32')
+input1 = Input(shape=(config.input_height, config.input_width, 3), dtype='float32')
 
 x = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
-temp = x
+skipRes = x
 
 # Resnet layers
 for i in range(16):
@@ -130,17 +130,17 @@ for i in range(16):
 
 x = Conv2D(64, (3, 3), activation='relu', padding='same') (x) 
 x = BatchNormalization()(x)
-x = Add()([temp, x])
+x = Add()([skipRes, x])
 
 # Sub-pixel convolution layer 1
-r = 4
+r = 4 #Upscale x4
 x = Conv2D(3*r*r, (3, 3), activation='relu', padding='same') (x) 
 x = Lambda(lambda x: PS(x, r))(x)
 x = Activation('tanh')(x)
 
 x = Conv2D(128, (3, 3), activation='relu', padding='same') (x) 
 # Sub-pixel convolution layer 2
-r = 2
+r = 2 #Upscale x2
 x = Conv2D(3*r*r, (3, 3), activation='relu', padding='same') (x) 
 x = Lambda(lambda x: PS(x, r))(x)
 x = Activation('tanh')(x)
