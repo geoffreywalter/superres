@@ -9,11 +9,12 @@ from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add
 from tensorflow.keras import backend as K
-from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.callbacks import Callback, EarlyStopping
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import wandb
 from wandb.keras import WandbCallback
 from helpfunc import PS, perceptual_distance
+from models import SRResNet
 
 
 #GPU config
@@ -59,7 +60,7 @@ class ImageLogger(Callback):
             "examples": [wandb.Image(np.concatenate([in_resized[i] * 255, o * 255, out_sample_images[i] * 255], axis=1)) for i, o in enumerate(preds)]
         }, commit=False)
 
-def image_generator(batch_size, img_dir, augment=True):
+def image_generator(batch_size, img_dir, augment=False):
     """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
     input_filenames = glob.glob(img_dir + "/*-in.jpg")
     counter = 0
@@ -102,53 +103,14 @@ def image_generator(batch_size, img_dir, augment=True):
             yield (small_images, large_images)
         counter += batch_size
 
-#base_model = tf.keras.applications.ResNet50(include_top=False, weights=None, input_tensor=None, input_shape=[32, 32, 3], pooling=None)
-# model = Sequential()
-# model.add(layers.Conv2D(64, (5, 5), activation='relu', padding='same',
-                         # input_shape=(config.input_width, config.input_height, 3)))
-# model.add(layers.Conv2D(32, (3, 3), activation='relu', padding='same'))
-# model.add(layers.Conv2D(3*8², (3, 3), activation='relu', padding='same'))
 
-def resBlock(tens, filter_size):
-    x = Conv2D(filter_size, (3, 3), padding='same') (tens)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Conv2D(filter_size, (3, 3), padding='same') (x)
-    x = BatchNormalization()(x)
-    x = Add()([x, tens])
-    x = Activation('relu')(x)
-    return x
-
+# Neural network
 input1 = Input(shape=(config.input_height, config.input_width, 3), dtype='float32')
 
-x = Conv2D(64, (5, 5), activation='relu', padding='same') (input1)
-skipRes = x
-
-# Resnet layers
-for i in range(16):
-    x = resBlock(x, 64)
-
-x = Conv2D(64, (3, 3), activation='relu', padding='same') (x) 
-x = BatchNormalization()(x)
-x = Add()([skipRes, x])
-
-# Sub-pixel convolution layer 1
-r = 4 #Upscale x4
-x = Conv2D(3*r*r, (3, 3), activation='relu', padding='same') (x) 
-x = Lambda(lambda x: PS(x, r))(x)
-x = Activation('tanh')(x)
-
-x = Conv2D(128, (3, 3), activation='relu', padding='same') (x) 
-# Sub-pixel convolution layer 2
-r = 2 #Upscale x2
-x = Conv2D(3*r*r, (3, 3), activation='relu', padding='same') (x) 
-x = Lambda(lambda x: PS(x, r))(x)
-x = Activation('tanh')(x)
-
-x = Conv2D(3, (9, 9), activation='relu', padding='same') (x) 
-
-model = Model(inputs=input1, outputs=x)
+model = Model(inputs=input1, outputs=SRResNet(input1))
 print(model.summary())
+
+es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=30)
 
 # DONT ALTER metrics=[perceptual_distance]
 model.compile(optimizer='adam', loss='mse',
@@ -157,6 +119,6 @@ model.compile(optimizer='adam', loss='mse',
 model.fit_generator(image_generator(config.batch_size, train_dir),
                     steps_per_epoch=config.steps_per_epoch,
                     epochs=config.num_epochs, callbacks=[
-                        ImageLogger(), WandbCallback()],
+                        es, ImageLogger(), WandbCallback()],
                     validation_steps=config.val_steps_per_epoch,
                     validation_data=image_generator(config.batch_size, val_dir))
