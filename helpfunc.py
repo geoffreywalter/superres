@@ -16,6 +16,17 @@ def perceptual_distance(y_true, y_pred):
 
     return K.mean(K.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
 
+def perceptual_distance_np(y_true, y_pred):
+    """Calculate perceptual distance, DO NOT ALTER"""
+    y_true *= 255
+    y_pred *= 255
+    rmean = (y_true[:, :, :, 0] + y_pred[:, :, :, 0]) / 2
+    r = y_true[:, :, :, 0] - y_pred[:, :, :, 0]
+    g = y_true[:, :, :, 1] - y_pred[:, :, :, 1]
+    b = y_true[:, :, :, 2] - y_pred[:, :, :, 2]
+
+    return np.mean(np.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
+
 # _phase_shift and PS from https://github.com/tetrachrome/subpixel/blob/master/subpixel.py
 def _phase_shift(I, r):
     # Helper function with main phase shift operation

@@ -1,6 +1,6 @@
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten, LeakyReLU
 from helpfunc import PS, perceptual_distance
 
 def resBlock(tens, filter_size):
@@ -46,12 +46,18 @@ def create_discriminator():
 
     x = Conv2D(64, (3, 3), strides=2, padding='same') (x) 
     x = BatchNormalization()(x)
-    x = Activation('relu')(x)
+    x = LeakyReLU(alpha=0.2)(x)
 
     #x = Conv2D(128, (3, 3), strides=1, padding='same') (x) 
     x = Conv2D(32, (3, 3), strides=2, padding='same') (x) 
+    x = LeakyReLU(alpha=0.2)(x)
+    x = BatchNormalization()(x)
     x = Conv2D(32, (3, 3), strides=2, padding='same') (x) 
+    x = LeakyReLU(alpha=0.2)(x)
+    x = BatchNormalization()(x)
     x = Conv2D(32, (3, 3), strides=2, padding='same') (x) 
+    x = LeakyReLU(alpha=0.2)(x)
+    x = BatchNormalization()(x)
     #x = Conv2D(256, (3, 3), strides=1, padding='same') (x) 
     #x = Conv2D(256, (3, 3), strides=2, padding='same') (x) 
     #x = Conv2D(512, (3, 3), strides=1, padding='same') (x) 
@@ -74,6 +80,6 @@ def create_gan(generator, discriminator):
     x = generator(gan_input)
     gan_output= discriminator(x)
     gan = Model(inputs=gan_input, outputs=gan_output)
-    gan.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
+    gan.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return gan
 
