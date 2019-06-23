@@ -1,7 +1,7 @@
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense
-from helpfunc import PS
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten
+from helpfunc import PS, perceptual_distance
 
 def resBlock(tens, filter_size):
     x = Conv2D(filter_size, (3, 3), padding='same') (tens)
@@ -18,7 +18,7 @@ def SRResNet(input):
     skipRes = x
 
     # Resnet layers
-    for i in range(16):
+    for i in range(2):
         x = resBlock(x, 64)
 
     x = Conv2D(64, (3, 3), activation='relu', padding='same') (x) 
@@ -35,31 +35,37 @@ def SRResNet(input):
     return x
     
 def create_generator():
-    input = Input(shape=image_shape_gen)
+    input = Input(shape=(32, 32, 3))
     model = Model(inputs=input, outputs=SRResNet(input))
+    #model.compile(loss='mse', optimizer='adam', metrics=[perceptual_distance])
     return model
 
 def create_discriminator():
-    input = Input(shape=image_shape_dis)
+    input = Input(shape=(256, 256, 3))
     x = Conv2D(64, (3, 3), activation='relu', padding='same') (input)
 
     x = Conv2D(64, (3, 3), strides=2, padding='same') (x) 
     x = BatchNormalization()(x)
     x = Activation('relu')(x)
 
-    x = Conv2D(128, (3, 3), strides=1, padding='same') (x) 
-    x = Conv2D(128, (3, 3), strides=2, padding='same') (x) 
-    x = Conv2D(256, (3, 3), strides=1, padding='same') (x) 
-    x = Conv2D(256, (3, 3), strides=2, padding='same') (x) 
-    x = Conv2D(512, (3, 3), strides=1, padding='same') (x) 
-    x = Conv2D(512, (3, 3), strides=2, padding='same') (x) 
+    #x = Conv2D(128, (3, 3), strides=1, padding='same') (x) 
+    x = Conv2D(32, (3, 3), strides=2, padding='same') (x) 
+    x = Conv2D(32, (3, 3), strides=2, padding='same') (x) 
+    x = Conv2D(32, (3, 3), strides=2, padding='same') (x) 
+    #x = Conv2D(256, (3, 3), strides=1, padding='same') (x) 
+    #x = Conv2D(256, (3, 3), strides=2, padding='same') (x) 
+    #x = Conv2D(512, (3, 3), strides=1, padding='same') (x) 
+    #x = Conv2D(512, (3, 3), strides=2, padding='same') (x) 
     
-    x = Dense(1024) (x)
+    #x = Dense(1024) (x)
+    x = Dense(256) (x)
     x = Activation('relu')(x)
+    x = Flatten()(x)
     x = Dense(1) (x)
     x = Activation('sigmoid')(x)
         
     model = Model(inputs=input, outputs=x)
+    model.compile(loss='binary_crossentropy', optimizer='adam')
     return model
 
 def create_gan(generator, discriminator):
@@ -67,7 +73,7 @@ def create_gan(generator, discriminator):
     gan_input = Input(shape=(32, 32, 3))
     x = generator(gan_input)
     gan_output= discriminator(x)
-    gan= Model(inputs=gan_input, outputs=gan_output)
-    gan.compile(loss='binary_crossentropy', optimizer='adam', metrics=[perceptual_distance])
+    gan = Model(inputs=gan_input, outputs=gan_output)
+    gan.compile(loss='binary_crossentropy', optimizer='adam', metrics=['acc'])
     return gan
 
