@@ -3,3 +3,4 @@ wandb/*
 requirements*
 wandb/settings
 __pycache__/*
+*/h5
