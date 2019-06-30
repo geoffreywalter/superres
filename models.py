@@ -7,32 +7,108 @@ from helpfunc import PS, perceptual_distance
 def resBlock(tens, filter_size):
     x = Conv2D(filter_size, (3, 3), padding='same') (tens)
     x = BatchNormalization()(x)
-    x = Activation('tanh')(x)
+    x = Activation('relu')(x)
     x = Conv2D(filter_size, (3, 3), padding='same') (x)
     x = BatchNormalization()(x)
     x = Add()([x, tens])
-    x = Activation('tanh')(x)
+    x = Activation('relu')(x)
     return x
 
 def SRResNet(input):
-    x = Conv2D(64, (5, 5), activation='tanh', padding='same') (input)
-    skipRes = x
+    skipRes = x = Conv2D(64, (9, 9), activation='relu', padding='same') (input)
 
-    # Resnet layers
+    # Residual blocks
     for i in range(16):
         x = resBlock(x, 64)
 
-    x = Conv2D(64, (3, 3), activation='tanh', padding='same') (x) 
+    x = Conv2D(64, (3, 3), padding='same') (x) 
     x = BatchNormalization()(x)
     x = Add()([skipRes, x])
 
-    # Sub-pixel convolution layer 1
+    # Sub-pixel convolution layer
     r = 8 #Upscale x8
-    x = Conv2D(3*r*r, (3, 3), activation='tanh', padding='same') (x) 
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
     x = Lambda(lambda x: PS(x, r))(x)
-    x = Activation('tanh')(x)
 
-    #x = Conv2D(3, (9, 9), activation='relu', padding='same') (x) 
+    x = Conv2D(3, (9, 9), activation='tanh', padding='same') (x) 
+    return x
+
+def EDSRBlock(tens, filter_size):
+    x = Conv2D(filter_size, (3, 3), padding='same') (tens)
+    x = Activation('relu')(x)
+    x = Conv2D(filter_size, (3, 3), padding='same') (x)
+    x = Lambda(lambda x: x * 0.1)(x)
+    x = Add()([x, tens])
+    return x
+    
+def EDSR(input, filters, nBlocks):
+    skipRes = x = Conv2D(filters, (3, 3), padding='same') (input)
+
+    # Residual blocks
+    for i in range(nBlocks):
+        x = EDSRBlock(x, filters)
+
+    x = Conv2D(filters, (3, 3), padding='same') (x)
+    x = Add()([skipRes, x])
+
+    # Sub-pixel convolution layer
+    r = 8 #Upscale x8
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Lambda(lambda x: PS(x, r))(x)
+
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
+    return x
+    
+def EEDSR(input, filters, nBlocks):
+    skipRes = x = Conv2D(filters, (3, 3), padding='same') (input)
+
+    # Residual blocks
+    for i in range(nBlocks):
+        x = EDSRBlock(x, filters)
+
+    x = Conv2D(filters, (3, 3), padding='same') (x)
+    x = Add()([skipRes, x])
+
+    # Sub-pixel convolution layer
+    r = 2 #Upscale x2
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Lambda(lambda x: PS(x, r))(x)
+
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
+   
+    ### X 4
+    skipRes = x = Conv2D(int(filters/2), (3, 3), padding='same') (x)
+
+    # Residual blocks
+    for i in range(int(nBlocks/2)):
+        x = EDSRBlock(x, int(filters/2))
+
+    x = Conv2D(int(filters/2), (3, 3), padding='same') (x)
+    x = Add()([skipRes, x])
+
+    # Sub-pixel convolution layer
+    r = 2 #Upscale x2
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Lambda(lambda x: PS(x, r))(x)
+
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
+
+    ### X 8
+    skipRes = x = Conv2D(int(filters/4), (3, 3), padding='same') (x)
+
+    # Residual blocks
+    for i in range(int(nBlocks/4)):
+        x = EDSRBlock(x, int(filters/4))
+
+    x = Conv2D(int(filters/4), (3, 3), padding='same') (x)
+    x = Add()([skipRes, x])
+
+    # Sub-pixel convolution layer
+    r = 2 #Upscale x2
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Lambda(lambda x: PS(x, r))(x)
+
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
     return x
     
 def create_generator():

@@ -7,6 +7,8 @@
 ### To explore
 - Use Conv2DTranspose instead of UpSampling2D
 - Scale all pixel values to the range [-1, 1]
+- Try LapSRN (good for x8)
+- Try SREdgeNET (different concept for SR)
 
 ## Optimization of network
 - Tips and tricks to make GANs work https://github.com/soumith/ganhacks

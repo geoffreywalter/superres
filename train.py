@@ -14,7 +14,7 @@ from tensorflow.keras.callbacks import Callback, EarlyStopping, LambdaCallback
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import wandb
 from wandb.keras import WandbCallback
-from helpfunc import PS, perceptual_distance, perceptual_distance_np
+from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator
 from models import SRResNet, create_generator, create_discriminator, create_gan
 
 
@@ -55,7 +55,7 @@ config.val_steps_per_epoch = len(
 
 class ImageLogger(Callback):
     def on_epoch_end(self, epoch, logs):
-        in_sample_images, out_sample_images = next(image_generator(config.batch_size, val_dir))
+        in_sample_images, out_sample_images = next(image_generator(5, val_dir, config, shuffle=False))
         preds = self.model.predict(in_sample_images)
         in_resized = []
         # Simple upsampling
@@ -66,21 +66,6 @@ class ImageLogger(Callback):
         wandb.log({
             "examples": [wandb.Image(np.concatenate([(in_resized[i] + 1.0) * 127.5, (o + 1.0) * 127.5, (out_sample_images[i] + 1.0) * 127.5], axis=1)) for i, o in enumerate(preds)]
         }, commit=False)
-
-def image_generator_sample(batch_size, img_dir):
-    """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
-    input_filenames = glob.glob(img_dir + "/*-in.jpg")
-    while True:
-        small_images = np.zeros(
-            (batch_size, config.input_width, config.input_height, 3))
-        large_images = np.zeros(
-            (batch_size, config.output_width, config.output_height, 3))
-        for i in range(batch_size):
-            img = input_filenames[i]
-            small_images[i] = np.array(Image.open(img)) / 127.5 - 1.0
-            large_images[i] = np.array(
-                Image.open(img.replace("-in.jpg", "-out.jpg"))) / 127.5 - 1.0
-        yield (small_images, large_images)
 
 def image_generator_gan(batch_size, img_dir):
     """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
@@ -182,7 +167,7 @@ def train_generator(generator, discriminator, joint_model):
     # generator.save(path.join(wandb.run.dir, "generator.h5"))
     
 def sample_images(generator, i):
-    in_sample_images, out_sample_images = next(image_generator_sample(5, val_dir))
+    in_sample_images, out_sample_images = next(image_generator_sample(5, val_dir, config, shuffle=True))
     preds = generator.predict(in_sample_images)
     in_resized = []
     # Simple upsampling
@@ -198,7 +183,7 @@ def sample_images(generator, i):
     perc = 0
     if (i%400 == 1):
         #for n in range(config.steps_per_epoch):
-        in_sample_images, out_sample_images = next(image_generator_sample(config.batch_size, train_dir))
+        in_sample_images, out_sample_images = next(image_generator(config.batch_size, train_dir, config, shuffle=False))
         preds = generator.predict(in_sample_images)
         perc += perceptual_distance_np(out_sample_images, preds)
             
