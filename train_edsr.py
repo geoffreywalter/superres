@@ -26,7 +26,7 @@ session = tf.Session(config=config)
 run = wandb.init(project='superres')
 config = run.config
 
-config.num_epochs = 60
+config.num_epochs = 70
 config.batch_size = 32
 config.input_height = 32
 config.input_width = 32
@@ -59,8 +59,9 @@ print(model.summary())
 
 es = EarlyStopping(monitor='val_perceptual_distance', mode='min', verbose = 1, patience=2)
 mc = ModelCheckpoint('edsr.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
+
 ##DONT ALTER metrics=[perceptual_distance]
-model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
+model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
 
 model.fit_generator(image_generator(config.batch_size, config.train_dir, config),
                     steps_per_epoch=config.steps_per_epoch,

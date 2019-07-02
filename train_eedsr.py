@@ -59,6 +59,7 @@ print(model.summary())
 
 es = EarlyStopping(monitor='val_perceptual_distance', mode='min', patience=2)
 mc = ModelCheckpoint('eedsr.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
+
 ##DONT ALTER metrics=[perceptual_distance]
 model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
 

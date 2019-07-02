@@ -67,10 +67,11 @@ def denormalize(x, norm0):
     else:
         return (x + 1.0) * 127.5 
         
-def image_generator(batch_size, img_dir, config, shuffle=True, augment=False):
+def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
     """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
     input_filenames = glob.glob(img_dir + "/*-in.jpg")
     counter = 0
+    printed = False
     if shuffle:
         random.shuffle(input_filenames)
     while True:
@@ -82,9 +83,9 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=False):
             counter = 0
         for i in range(batch_size):
             img = input_filenames[counter + i]
-            small_images[i] = normalize(np.array(Image.open(img)), config.norm0)
-            large_images[i] = normalize(np.array(
-                Image.open(img.replace("-in.jpg", "-out.jpg"))), config.norm0)
+            small_images[i] = np.array(Image.open(img))
+            large_images[i] = np.array(
+                Image.open(img.replace("-in.jpg", "-out.jpg")))
         
         if img_dir == config.train_dir and augment:
             #Data augmentation
@@ -92,11 +93,18 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=False):
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
                         #rotation_range=90,
-                        #width_shift_range=0.2,
-                        #height_shift_range=0.2,
-                        vertical_flip=True)
+                        brightness_range=(0.8, 1.0),
+                        width_shift_range=0.2,
+                        height_shift_range=0.2,
+                        vertical_flip=True,
+                        horizontal_flip=True)
                         #shear_range=0.2,
                         #zoom_range=0.2)
+            
+            if not  printed:
+                print(data_gen_args)
+                printed = True
+            
             image_datagen = ImageDataGenerator(**data_gen_args)
 
             seed = random.randint(1, 100000)
@@ -105,8 +113,12 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=False):
 
             gen = zip(gen0, gen1)
             small_images_augmented, large_images_augmented = next(gen)
+            small_images_augmented = normalize(small_images_augmented, config.norm0)
+            large_images_augmented = normalize(large_images_augmented, config.norm0)
             yield (small_images_augmented, large_images_augmented)        
         else:
+            small_images = normalize(small_images, config.norm0)
+            large_images = normalize(large_images, config.norm0)
             yield (small_images, large_images)
         counter += batch_size
         
@@ -116,7 +128,7 @@ class ImageLogger(Callback):
         self.config = config
     def on_epoch_end(self, epoch, logs):
         config = self.config
-        in_sample_images, out_sample_images = next(image_generator(5, config.val_dir, config, shuffle=False))
+        in_sample_images, out_sample_images = next(image_generator(5, config.val_dir, config, shuffle=True))
         preds = self.model.predict(in_sample_images)
         in_resized = []
         # Simple upsampling

@@ -14,14 +14,14 @@ def resBlock(tens, filter_size):
     x = Activation('relu')(x)
     return x
 
-def SRResNet(input):
-    skipRes = x = Conv2D(64, (9, 9), activation='relu', padding='same') (input)
+def SRResNet(input, filters, nBlocks):
+    skipRes = x = Conv2D(filters, (9, 9), activation='relu', padding='same') (input)
 
     # Residual blocks
-    for i in range(16):
-        x = resBlock(x, 64)
+    for i in range(nBlocks):
+        x = resBlock(x, filters)
 
-    x = Conv2D(64, (3, 3), padding='same') (x) 
+    x = Conv2D(filters, (3, 3), padding='same') (x) 
     x = BatchNormalization()(x)
     x = Add()([skipRes, x])
 

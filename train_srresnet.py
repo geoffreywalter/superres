@@ -34,6 +34,8 @@ config.output_height = 256
 config.output_width = 256
 config.norm0 = True
 config.name = "SRResNet"
+config.filters = 64
+config.nBlocks = 16
 
 config.val_dir = 'data/test'
 config.train_dir = 'data/train'
@@ -52,12 +54,13 @@ config.val_steps_per_epoch = len(
 
 # Neural network
 input1 = Input(shape=(config.input_height, config.input_width, 3), dtype='float32')
-model = Model(inputs=input1, outputs=SRResNet(input1))
+model = Model(inputs=input1, outputs=SRResNet(input1, config.filters, config.nBlocks))
 
 
 print(model.summary())
 
 es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=30)
+mc = ModelCheckpoint('srresnet.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
 
 ##DONT ALTER metrics=[perceptual_distance]
 model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
@@ -69,6 +72,5 @@ model.fit_generator(image_generator(config.batch_size, config.train_dir, config)
                     validation_steps=config.val_steps_per_epoch,
                     validation_data=image_generator(config.batch_size, config.val_dir, config))
 
-model.save_weights('srresnet.h5')                    
 
 

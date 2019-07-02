@@ -9,6 +9,7 @@
 - Scale all pixel values to the range [-1, 1]
 - Try LapSRN (good for x8)
 - Try SREdgeNET (different concept for SR)
+- SRDenseNet https://towardsdatascience.com/review-srdensenet-densenet-for-sr-super-resolution-cbee599de7e8
 
 ## Optimization of network
 - Tips and tricks to make GANs work https://github.com/soumith/ganhacks
