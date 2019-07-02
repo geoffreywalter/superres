@@ -74,6 +74,24 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
     printed = False
     if shuffle:
         random.shuffle(input_filenames)
+    if img_dir == config.train_dir and augment:
+        #Data augmentation
+        data_gen_args = dict(#featurewise_center=True,
+                        #featurewise_std_normalization=True,
+                        #zca_whitening=True,
+                        #rotation_range=90,
+                        brightness_range=(0.8, 1.0),
+                        #channel_shift=0.8,
+                        #width_shift_range=0.2, #Width shift range works, both shifts doesn't seem to work
+                        height_shift_range=0.2,
+                        vertical_flip=True,
+                        horizontal_flip=True)
+                        #shear_range=0.2,
+                        #zoom_range=0.2)
+            
+         print(data_gen_args)
+         image_datagen = ImageDataGenerator(**data_gen_args)
+
     while True:
         small_images = np.zeros(
             (batch_size, config.input_width, config.input_height, 3))
@@ -88,31 +106,10 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                 Image.open(img.replace("-in.jpg", "-out.jpg")))
         
         if img_dir == config.train_dir and augment:
-            #Data augmentation
-            data_gen_args = dict(#featurewise_center=True,
-                        #featurewise_std_normalization=True,
-                        #zca_whitening=True,
-                        #rotation_range=90,
-                        brightness_range=(0.8, 1.0),
-                        width_shift_range=0.2,
-                        height_shift_range=0.2,
-                        vertical_flip=True,
-                        horizontal_flip=True)
-                        #shear_range=0.2,
-                        #zoom_range=0.2)
-            
-            if not  printed:
-                print(data_gen_args)
-                printed = True
-            
-            image_datagen = ImageDataGenerator(**data_gen_args)
-
             seed = random.randint(1, 100000)
             gen0 = image_datagen.flow(small_images, batch_size=config.batch_size, shuffle=False, seed=seed)
             gen1 = image_datagen.flow(large_images, batch_size=config.batch_size, shuffle=False, seed=seed)
-
-            gen = zip(gen0, gen1)
-            small_images_augmented, large_images_augmented = next(gen)
+            small_images_augmented, large_images_augmented = next(zip(gen0, gen1))
             small_images_augmented = normalize(small_images_augmented, config.norm0)
             large_images_augmented = normalize(large_images_augmented, config.norm0)
             yield (small_images_augmented, large_images_augmented)        
