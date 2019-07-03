@@ -80,17 +80,17 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
                         #rotation_range=90,
-                        brightness_range=(0.8, 1.0),
-                        #channel_shift=0.8,
-                        #width_shift_range=0.2, #Width shift range works, both shifts doesn't seem to work
-                        height_shift_range=0.2,
+                        brightness_range=(0.5, 1.0), # 0 is black, 1 is same image
+                        channel_shift_range=30, # value in [-channel_shift_range, channel_shift_range] added to each channel
+                        #width_shift_range=0.2,
+                        #height_shift_range=0.2,
                         vertical_flip=True,
                         horizontal_flip=True)
                         #shear_range=0.2,
                         #zoom_range=0.2)
             
-         print(data_gen_args)
-         image_datagen = ImageDataGenerator(**data_gen_args)
+        print(data_gen_args)
+        image_datagen = ImageDataGenerator(**data_gen_args)
 
     while True:
         small_images = np.zeros(
@@ -112,6 +112,14 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
             small_images_augmented, large_images_augmented = next(zip(gen0, gen1))
             small_images_augmented = normalize(small_images_augmented, config.norm0)
             large_images_augmented = normalize(large_images_augmented, config.norm0)
+            if counter == 0:
+                in_resized = []
+                for arr in small_images_augmented:
+                    in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+                wandb.log({
+                    "augment": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(large_images_augmented[i], config.norm0)], axis=1)) for i in range(5)]
+                })
+            
             yield (small_images_augmented, large_images_augmented)        
         else:
             small_images = normalize(small_images, config.norm0)

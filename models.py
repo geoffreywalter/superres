@@ -1,6 +1,6 @@
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten, LeakyReLU
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten, LeakyReLU, Concatenate
 from tensorflow.keras.optimizers import Adam
 from helpfunc import PS, perceptual_distance
 
@@ -56,7 +56,7 @@ def EDSR(input, filters, nBlocks):
     x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
     x = Lambda(lambda x: PS(x, r))(x)
 
-    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
+    x = Conv2D(3, (3, 3), activation='relu', padding='same') (x) 
     return x
     
 def EEDSR(input, filters, nBlocks):
@@ -110,7 +110,37 @@ def EEDSR(input, filters, nBlocks):
 
     x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
     return x
+
+def DenseBlock(tens, filter_size, nLayers):
+    x = Conv2D(filter_size, (3, 3), padding='same') (tens)
+    x = Activation('relu')(x)
     
+    for i in range(nLayers):
+        mid = Conv2D(filter_size, (3, 3), activation='relu', padding='same') (x)
+        x = Concatenate()([x, mid])
+    return x
+    
+def SRDenseNet(input, filters, nBlocks, nLayers):
+    x = Conv2D(filters, (3, 3), padding='same') (input)
+    skipRes = x = Activation('relu')(x)
+
+    # Dense blocks
+    for i in range(nBlocks):
+        x = DenseBlock(x, filters, nLayers)
+        x = Concatenate()([x, skipRes])
+
+    # # BottleNeck Layer
+    # x = Conv2D(256, (1, 1), padding='same') (x)
+    # x = Activation('relu')(x)
+
+    # Sub-pixel convolution layer
+    r = 8 #Upscale x8
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Lambda(lambda x: PS(x, r))(x)
+
+    x = Conv2D(3, (3, 3), activation='relu', padding='same') (x) 
+    return x
+
 def create_generator():
     input = Input(shape=(32, 32, 3))
     model = Model(inputs=input, outputs=SRResNet(input))

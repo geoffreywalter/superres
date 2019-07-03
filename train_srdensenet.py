@@ -15,7 +15,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import wandb
 from wandb.keras import WandbCallback
 from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator, ImageLogger
-from models import SRResNet, create_generator, create_discriminator, create_gan, EDSR
+from models import SRResNet, create_generator, create_discriminator, create_gan, EDSR, SRDenseNet
 
 
 #GPU config
@@ -33,9 +33,10 @@ config.input_width = 32
 config.output_height = 256
 config.output_width = 256
 config.norm0 = True
-config.name = "EDSR"
-config.filters = 128
-config.nBlocks = 32
+config.name = "SRDenseNet"
+config.filters = 16
+config.nBlocks = 8
+config.nLayers = 8
 
 config.val_dir = 'data/test'
 config.train_dir = 'data/train'
@@ -53,13 +54,13 @@ config.val_steps_per_epoch = len(
 
 # Neural network
 input1 = Input(shape=(config.input_height, config.input_width, 3), dtype='float32')
-model = Model(inputs=input1, outputs=EDSR(input1, config.filters, config.nBlocks))
+model = Model(inputs=input1, outputs=SRDenseNet(input1, config.filters, config.nBlocks, config.nLayers))
 
 print(model.summary())
-#model.load_weights('edsr.h5')
+#model.load_weights('srdensenet.h5')
 
 #es = EarlyStopping(monitor='val_perceptual_distance', mode='min', verbose = 1, patience=2)
-mc = ModelCheckpoint('edsr.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
+mc = ModelCheckpoint('srdensenet.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
 
 ##DONT ALTER metrics=[perceptual_distance]
 model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
@@ -71,6 +72,5 @@ model.fit_generator(image_generator(config.batch_size, config.train_dir, config)
                     validation_steps=config.val_steps_per_epoch,
                     validation_data=image_generator(config.batch_size, config.val_dir, config))
 
-#model.save_weights('edsr.h5')                    
 
 
