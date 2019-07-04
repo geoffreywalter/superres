@@ -1,6 +1,6 @@
 # Results
 Images predicted with SRDenseNet
-![image](srdensenet_sample_test.jpg )
+![image](srdensenet_sample_test_reshaped.jpg )
 
 # Tips on GAN and optimization for superres
 ## Architecture

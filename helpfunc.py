@@ -133,7 +133,7 @@ class ImageLogger(Callback):
         self.config = config
     def on_epoch_end(self, epoch, logs):
         config = self.config
-        in_sample_images, out_sample_images = next(image_generator(5, config.val_dir, config, shuffle=True))
+        in_sample_images, out_sample_images = next(image_generator(7, config.val_dir, config, shuffle=True))
         preds = self.model.predict(in_sample_images)
         in_resized = []
         # Simple upsampling
@@ -141,13 +141,13 @@ class ImageLogger(Callback):
             in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
         
         # See learning on train set
-        in_sample_images_train, out_sample_images_train = next(image_generator(5, config.train_dir, config, shuffle=True, augment=False))
+        in_sample_images_train, out_sample_images_train = next(image_generator(7, config.train_dir, config, shuffle=True, augment=False))
         preds_train = self.model.predict(in_sample_images_train)
         in_resized_train = []
         for arr in in_sample_images_train:
             in_resized_train.append(arr.repeat(8, axis=0).repeat(8, axis=1))
 
         wandb.log({
-            "predict": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=1)) for i, o in enumerate(preds)]
-        ,   "train": [wandb.Image(np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1)) for i, o in enumerate(preds_train)]
+            "predict": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=0)) for i, o in enumerate(preds)]
+        ,   "train": [wandb.Image(np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=0)) for i, o in enumerate(preds_train)]
         }, commit=False)
