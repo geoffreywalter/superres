@@ -118,7 +118,7 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                     in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
                 wandb.log({
                     "augment": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(large_images_augmented[i], config.norm0)], axis=1)) for i in range(5)]
-                })
+                }, commit=False)
             
             yield (small_images_augmented, large_images_augmented)        
         else:
@@ -139,8 +139,15 @@ class ImageLogger(Callback):
         # Simple upsampling
         for arr in in_sample_images:
             in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
-        test_img = np.zeros(
-            (config.output_width, config.output_height, 3))
+        
+        # See learning on train set
+        in_sample_images_train, out_sample_images_train = next(image_generator(5, config.train_dir, config, shuffle=True, augment=False))
+        preds_train = self.model.predict(in_sample_images_train)
+        in_resized_train = []
+        for arr in in_sample_images_train:
+            in_resized_train.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+
         wandb.log({
-            "examples": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=1)) for i, o in enumerate(preds)]
+            "predict": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=1)) for i, o in enumerate(preds)]
+        ,   "train": [wandb.Image(np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1)) for i, o in enumerate(preds_train)]
         }, commit=False)

@@ -1,37 +1,29 @@
-# superres
+# Results
+Images predicted with SRDenseNet
+![image](srdensenet_sample_test.jpg )
 
-This is a benchmark project to make higher resolution versions of low resolution flower images:
+# Tips on GAN and optimization for superres
+## Architecture
+### SRGAN
+- Can train generator only, then GAN, then generator only (while loading models in between)
+- After GAN training, can save its model then use generator model only to perform SR and use metrics
 
-## Getting started
+### To explore
+- Use Conv2DTranspose instead of UpSampling2D
+- Log images predicted on train set
 
-1. Be sure to [sign up](https://app.wandb.ai/login?signup=true) for W&B.
-2. Clone this repository: `git clone https://github.com/wandb/superres.git`
-3. Run `pip install -U -r requirements.txt` to install requirements.
-4. Run `python train.py` to train the baseline model. Modify this file and the data pipeline (or write your own scripts and create different model architectures!) to get better results.
-5. Submit your results to the [benchmark](https://app.wandb.ai/wandb/superres/benchmark).
+## Notes
+- MSE gives worse performance than perceptual_distance
+- Try EDSR without final convolution **Seems better with final convolution layer**
+- Scale all pixel values to the range [-1, 1] **Seems worse than [0, 1], maybe because of the use of tanh instead of relu**
+- Try LapSRN (good for x8) **Seems to have poor performance**
 
-![rose](https://user-images.githubusercontent.com/17/58977464-a7104080-877e-11e9-82b1-24abe5677ee1.jpg)
+## Optimization of network
+- Tips and tricks to make GANs work https://github.com/soumith/ganhacks
+- After sub-pixel convolution, next convolution can't have relu as activation
 
-## The dataset
+## Ideas
+- Deconvolution and Checkerboard Artifacts https://distill.pub/2016/deconv-checkerboard/
 
-The dataset is comprised of images of flowers.  The training set has 5000 images of flowers that have been resized.  The test set has 670 images of flowers.  The input size is 32x32 pixels and the output size is 256x256 pixels.
 
 
-## The goal
-
-The goal is to enhance a low resolution input image to be 8 times greater resolution with the least loss of quality.
-
-## Evaluation
-
-We use a [perceptual distance](https://www.compuphase.com/cmetric.htm) metric (val_perceptual_distance) on the validation set to rank results (lower values are better).
-
-## Submitting your results
-
-You can submit your best runs to our [benchmark](https://app.wandb.ai/wandb/superres/benchmark). More specifically, go the "Runs" table in the "Project workspace" tab of your project.
-Hover over the run's name, click on the three-dot menu icon that appears to the left of the name, and select "Submit to benchmark".
-
-## Things to try
-
-- Implement a GAN
-- Different loss functions
-- Data augmentation

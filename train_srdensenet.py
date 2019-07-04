@@ -36,7 +36,7 @@ config.norm0 = True
 config.name = "SRDenseNet"
 config.filters = 16
 config.nBlocks = 8
-config.nLayers = 8
+config.nLayers = 16
 
 config.val_dir = 'data/test'
 config.train_dir = 'data/train'

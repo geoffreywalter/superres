@@ -56,7 +56,7 @@ def EDSR(input, filters, nBlocks):
     x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
     x = Lambda(lambda x: PS(x, r))(x)
 
-    x = Conv2D(3, (3, 3), activation='relu', padding='same') (x) 
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
     return x
     
 def EEDSR(input, filters, nBlocks):
@@ -83,7 +83,7 @@ def EEDSR(input, filters, nBlocks):
     for i in range(int(nBlocks/2)):
         x = EDSRBlock(x, int(filters/2))
 
-    x = Conv2D(int(filters/2), (3, 3), padding='same') (x)
+    x = Conv2D(int(filters/2), (3, 3), padding='sam e') (x)
     x = Add()([skipRes, x])
 
     # Sub-pixel convolution layer
@@ -121,24 +121,24 @@ def DenseBlock(tens, filter_size, nLayers):
     return x
     
 def SRDenseNet(input, filters, nBlocks, nLayers):
-    x = Conv2D(filters, (3, 3), padding='same') (input)
-    skipRes = x = Activation('relu')(x)
+    x = Conv2D(128, (3, 3), padding='same') (input)
+    con = x = Activation('relu')(x)
 
     # Dense blocks
     for i in range(nBlocks):
-        x = DenseBlock(x, filters, nLayers)
-        x = Concatenate()([x, skipRes])
+        x = DenseBlock(x, filters, nLayers)    
+        con = Concatenate()([x, con])
 
     # # BottleNeck Layer
-    # x = Conv2D(256, (1, 1), padding='same') (x)
+    #x = Conv2D(256, (3, 3), padding='same') (con)
     # x = Activation('relu')(x)
 
     # Sub-pixel convolution layer
     r = 8 #Upscale x8
-    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Conv2D(3*r*r, (3, 3), padding='same') (con) 
     x = Lambda(lambda x: PS(x, r))(x)
 
-    x = Conv2D(3, (3, 3), activation='relu', padding='same') (x) 
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
     return x
 
 def create_generator():
