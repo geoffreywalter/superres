@@ -146,8 +146,24 @@ class ImageLogger(Callback):
         in_resized_train = []
         for arr in in_sample_images_train:
             in_resized_train.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+        
+        #To see training on a single test image
+        img_lr = np.zeros((32, config.input_width, config.input_height, 3))
+        img_hr = np.zeros((32, config.output_width, config.output_height, 3))
+        img_name = "data/test/4738140013-rose-in.jpg"
+        img_lr[0] = normalize(np.array(Image.open(img_name)), config.norm0)
+        img_hr[0] = normalize(np.array(Image.open(img_name.replace("-in.jpg", "-out.jpg"))), config.norm0)
+        preds_learn = self.model.predict(img_lr)
+        in_resized_learn = []
+        in_resized_learn.append(img_lr[0].repeat(8, axis=0).repeat(8, axis=1))
 
+        # Output resizing
+        out_pred = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
+        img_pred_con = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
+        out_train = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
+        img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
         wandb.log({
-            "predict": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=0)) for i, o in enumerate(preds)]
-        ,   "train": [wandb.Image(np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=0)) for i, o in enumerate(preds_train)]
+            "predict": [wandb.Image(img_pred_con)]
+        ,   "train":   [wandb.Image(img_train_con)]
+        ,   "learn":   [wandb.Image(np.concatenate([denormalize(in_resized_learn[0], config.norm0), denormalize(preds_learn[0], config.norm0), denormalize(img_hr[0], config.norm0)], axis=0))]
         }, commit=False)

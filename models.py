@@ -130,12 +130,12 @@ def SRDenseNet(input, filters, nBlocks, nLayers):
         con = Concatenate()([x, con])
 
     # # BottleNeck Layer
-    #x = Conv2D(256, (3, 3), padding='same') (con)
-    # x = Activation('relu')(x)
+    x = Conv2D(512, (1, 1), padding='same') (con)
+    x = Activation('relu')(x)
 
     # Sub-pixel convolution layer
     r = 8 #Upscale x8
-    x = Conv2D(3*r*r, (3, 3), padding='same') (con) 
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
     x = Lambda(lambda x: PS(x, r))(x)
 
     x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 

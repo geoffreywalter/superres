@@ -1,5 +1,5 @@
 # Results
-Images predicted with SRDenseNet
+Images predicted with SRDenseNet:
 ![image](srdensenet_sample_test_reshaped.jpg )
 
 # Tips on GAN and optimization for superres
@@ -11,6 +11,8 @@ Images predicted with SRDenseNet
 ### To explore
 - Use Conv2DTranspose instead of UpSampling2D
 - Log images predicted on train set
+- Add training progress on images (gif)
+- Add data augmentation examples
 
 ## Notes
 - MSE gives worse performance than perceptual_distance
