@@ -26,7 +26,7 @@ session = tf.Session(config=config)
 run = wandb.init(project='superres')
 config = run.config
 
-config.num_epochs = 70
+config.num_epochs = 80
 config.batch_size = 32
 config.input_height = 32
 config.input_width = 32

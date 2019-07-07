@@ -121,7 +121,7 @@ def DenseBlock(tens, filter_size, nLayers):
     return x
     
 def SRDenseNet(input, filters, nBlocks, nLayers):
-    x = Conv2D(128, (3, 3), padding='same') (input)
+    x = Conv2D(256, (3, 3), padding='same') (input)
     con = x = Activation('relu')(x)
 
     # Dense blocks
@@ -130,12 +130,12 @@ def SRDenseNet(input, filters, nBlocks, nLayers):
         con = Concatenate()([x, con])
 
     # # BottleNeck Layer
-    x = Conv2D(512, (1, 1), padding='same') (con)
-    x = Activation('relu')(x)
+    # x = Conv2D(512, (1, 1), padding='same') (con)
+    # x = Activation('relu')(x)
 
     # Sub-pixel convolution layer
     r = 8 #Upscale x8
-    x = Conv2D(3*r*r, (3, 3), padding='same') (x) 
+    x = Conv2D(3*r*r, (3, 3), padding='same') (con) 
     x = Lambda(lambda x: PS(x, r))(x)
 
     x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
@@ -143,8 +143,8 @@ def SRDenseNet(input, filters, nBlocks, nLayers):
 
 def create_generator():
     input = Input(shape=(32, 32, 3))
-    model = Model(inputs=input, outputs=SRResNet(input))
-    #model.compile(loss='mse', optimizer='adam', metrics=[perceptual_distance])
+    model = Model(inputs=input, outputs=EDSR(input, 128, 32))
+   #model.compile(loss='mse', optimizer='adam', metrics=[perceptual_distance])
     return model
 
 def create_discriminator():

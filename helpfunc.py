@@ -113,11 +113,13 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
             small_images_augmented = normalize(small_images_augmented, config.norm0)
             large_images_augmented = normalize(large_images_augmented, config.norm0)
             if counter == 0:
-                in_resized = []
-                for arr in small_images_augmented:
-                    in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+                # in_resized = []
+                # for arr in small_images_augmented:
+                    # in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+                augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(5)]
+                augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
                 wandb.log({
-                    "augment": [wandb.Image(np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(large_images_augmented[i], config.norm0)], axis=1)) for i in range(5)]
+                    "augment": [wandb.Image(augment_con)]
                 }, commit=False)
             
             yield (small_images_augmented, large_images_augmented)        
@@ -135,36 +137,56 @@ class ImageLogger(Callback):
         config = self.config
         in_sample_images, out_sample_images = next(image_generator(7, config.val_dir, config, shuffle=True))
         preds = self.model.predict(in_sample_images)
-        in_resized = []
         # Simple upsampling
-        for arr in in_sample_images:
-            in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+        in_resized = [in_sample_images[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(in_sample_images))]
         
         # To see predictions on train set
         in_sample_images_train, out_sample_images_train = next(image_generator(7, config.train_dir, config, shuffle=True, augment=False))
         preds_train = self.model.predict(in_sample_images_train)
-        in_resized_train = []
-        for arr in in_sample_images_train:
-            in_resized_train.append(arr.repeat(8, axis=0).repeat(8, axis=1))
+        in_resized_train = [in_sample_images_train[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(in_sample_images_train))]
         
-        # To see learning evolution on a single test image
-        img_lr = np.zeros((1, config.input_width, config.input_height, 3))
-        img_hr = np.zeros((1, config.output_width, config.output_height, 3))
-        img_name = "data/test/4738140013-rose-in.jpg"
-        img_lr[0] = normalize(np.array(Image.open(img_name)), config.norm0)
-        img_hr[0] = normalize(np.array(Image.open(img_name.replace("-in.jpg", "-out.jpg"))), config.norm0)
+        # To see learning evolution on a test image
+        img_lr = np.zeros((5, config.input_width, config.input_height, 3))
+        img_hr = np.zeros((5, config.output_width, config.output_height, 3))
+        img_name = ["data/test/4738140013-rose-in.jpg", "data/test/35869417191-hydrangea-in.jpg", "data/test/35825252922-orchid-in.jpg", "data/test/7503047224-daisy-in.jpg", "data/test/flowers-petals-plants-39517-in.jpg"]
+        for i in range(len(img_name)):
+            img_lr[i] = normalize(np.array(Image.open(img_name[i])), config.norm0)
+            img_hr[i] = normalize(np.array(Image.open(img_name[i].replace("-in.jpg", "-out.jpg"))), config.norm0)
         preds_learn = self.model.predict(img_lr)
-        in_resized_learn = [img_lr[0].repeat(8, axis=0).repeat(8, axis=1)]
+        in_resized_learn = [img_lr[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(img_name))]
 
         # Output log formatting
         out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
         img_pred_con  = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
         out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
         img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
-        img_learn     = np.concatenate([denormalize(in_resized_learn[0], config.norm0), denormalize(preds_learn[0], config.norm0), denormalize(img_hr[0], config.norm0)], axis=0)
+        out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
+        img_learn_con = np.transpose(np.concatenate(out_learn), axes=(0, 1, 2))
+        
+        # #Create gif for training
+        # if epoch == 0:
+            # Image.fromarray(img_learn_con.astype("uint8")).save('train.gif', format='GIF', save_all=True, duration=500, loop=0)
+        # else:
+            # gif_pil = Image.open('train.gif')
+            # gif_frames = []
+            # for frame in range(0, gif_pil.n_frames):
+                # gif_pil.seek(frame)
+                # gif_frames.append([np.array(gif_pil), gif_pil.getpalette()])
+            # print("len gif_frames=" + str(len(gif_frames)))
+            
+            # # gif_frames_pil = [Image.fromarray(gif_frames[i].astype("uint8")) for i in range(len(gif_frames))]
+            # gif_frames_pil = []
+            # for f, palette in gif_frames:
+                # image = Image.fromarray(f.astype("uint8"))
+                # image.putpalette(palette)
+                # gif_frames_pil.append(image)   
+            
+            # gif_frames_pil.append(Image.fromarray(img_learn_con.astype("uint8")))
+            # gif_frames_pil[0].save('train.gif', format='GIF', append_images=gif_frames_pil[1:], save_all=True, duration=500, loop=0)
+        
         
         wandb.log({
             "predict": [wandb.Image(img_pred_con)]
         ,   "train":   [wandb.Image(img_train_con)]
-        ,   "learn":   [wandb.Image(img_learn)]
+        ,   "learn":   [wandb.Image(img_learn_con)]
         }, commit=False)
