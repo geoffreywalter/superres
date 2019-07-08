@@ -13,6 +13,8 @@ Images predicted with SRDenseNet:
 - Log images predicted on train set
 - Add training progress on images (gif)
 - Add data augmentation examples
+- Use Edge detection model in the middle of neural network
+- Use pretrained network
 
 ## Notes
 - MSE gives worse performance than perceptual_distance

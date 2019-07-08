@@ -11,11 +11,10 @@ from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback, EarlyStopping, LambdaCallback, ModelCheckpoint
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import wandb
 from wandb.keras import WandbCallback
-from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator, ImageLogger
-from models import SRResNet, create_generator, create_discriminator, create_gan, EDSR, SRDenseNet
+from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator_canny, ImageLoggerCanny
+from models import Canny
 
 
 #GPU config
@@ -26,17 +25,16 @@ session = tf.Session(config=config)
 run = wandb.init(project='superres')
 config = run.config
 
-config.num_epochs = 80
+config.num_epochs = 20
 config.batch_size = 32
-config.input_height = 32
-config.input_width = 32
+config.input_height = 256
+config.input_width = 256
 config.output_height = 256
 config.output_width = 256
 config.norm0 = True
-config.name = "SRDenseNet"
-config.filters = 16
-config.nBlocks = 8
-config.nLayers = 16
+config.name = "Canny"
+config.filters = 64
+config.nBlocks = 6
 
 config.val_dir = 'data/test'
 config.train_dir = 'data/train'
@@ -54,23 +52,21 @@ config.val_steps_per_epoch = len(
 
 # Neural network
 input1 = Input(shape=(config.input_height, config.input_width, 3), dtype='float32')
-model = Model(inputs=input1, outputs=SRDenseNet(input1, config.filters, config.nBlocks, config.nLayers))
+model = Model(inputs=input1, outputs=Canny(input1, config.filters, config.nBlocks))
 
 print(model.summary())
-#model.load_weights('srdensenet.h5')
+#model.load_weights('edsr.h5')
 
-#es = EarlyStopping(monitor='val_perceptual_distance', mode='min', verbose = 1, patience=2)
-mc = ModelCheckpoint('srdensenet.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
+mc = ModelCheckpoint('canny.h5', monitor='acc', mode='min', save_best_only=True)
 
 ##DONT ALTER metrics=[perceptual_distance]
-model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
+model.compile(optimizer='adam', loss='mse', metrics=["acc"])
 
-model.fit_generator(image_generator(config.batch_size, config.train_dir, config),
-                    steps_per_epoch=1,
+model.fit_generator(image_generator_canny(config.batch_size, config.train_dir, config),
+                    steps_per_epoch=config.steps_per_epoch,
                     epochs=config.num_epochs, callbacks=[
-                        mc, ImageLogger(config), WandbCallback()],
-                    validation_steps=1,
-                    validation_data=image_generator(config.batch_size, config.val_dir, config))
+                        mc, ImageLoggerCanny(config), WandbCallback()])
 
+#model.save_weights('edsr.h5')                    
 
 

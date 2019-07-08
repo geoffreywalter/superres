@@ -7,6 +7,11 @@ from PIL import Image
 import numpy as np
 import random
 import wandb
+from skimage.transform import resize
+from skimage import feature
+
+from canny_utils import rgb2gray
+import canny_edge_detector as ced
 
 def perceptual_distance(y_true, y_pred):
     """Calculate perceptual distance, DO NOT ALTER"""
@@ -74,8 +79,19 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
     printed = False
     if shuffle:
         random.shuffle(input_filenames)
-    if img_dir == config.train_dir and augment:
         #Data augmentation
+        data_gen_args_cust = dict(#featurewise_center=True,
+                        #featurewise_std_normalization=True,
+                        #zca_whitening=True,
+                        rotation_range=90,
+                        brightness_range=(0.5, 1.0), # 0 is black, 1 is same image
+                        channel_shift_range=30, # value in [-channel_shift_range, channel_shift_range] added to each channel
+                        width_shift_range=0.2,
+                        height_shift_range=0.2,
+                        vertical_flip=True,
+                        horizontal_flip=True,
+                        shear_range=0.2,
+                        zoom_range=0.2)
         data_gen_args = dict(#featurewise_center=True,
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
@@ -88,11 +104,17 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                         horizontal_flip=True)
                         #shear_range=0.2,
                         #zoom_range=0.2)
-            
-        print(data_gen_args)
-        image_datagen = ImageDataGenerator(**data_gen_args)
 
     while True:
+        if img_dir == config.train_dir and augment:
+            # sel_custom = random.randint(1, 4) == 3
+            # if sel_custom:
+                # image_datagen = ImageDataGenerator(**data_gen_args_cust)
+                # print(data_gen_args_cust)
+            # else:
+            image_datagen = ImageDataGenerator(**data_gen_args)
+                # print(data_gen_args)
+            
         small_images = np.zeros(
             (batch_size, config.input_width, config.input_height, 3))
         large_images = np.zeros(
@@ -112,10 +134,19 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
             small_images_augmented, large_images_augmented = next(zip(gen0, gen1))
             small_images_augmented = normalize(small_images_augmented, config.norm0)
             large_images_augmented = normalize(large_images_augmented, config.norm0)
+           
+            #small_image_resized = resize(large_images_augmented, (config.batch_size, config.input_width, config.input_height, 3), preserve_range=True, order=1, anti_aliasing=False)            
+            # if sel_custom:
+                # small_images_augmented = resize(large_images_augmented, (config.batch_size, config.input_width, config.input_height, 3), preserve_range=True, order=1, anti_aliasing=False)            
+            
+            # totalerr = 0
+            # for i in range(config.batch_size):
+                # err = np.sum((small_images[i].astype("float") - small_image_resized[i].astype("float")) ** 2)
+                # err /= float(small_images[i].shape[0] * small_images[i].shape[1])
+                # totalerr += err
+            # print("===Resizing difference=" + str(totalerr/config.batch_size))
+
             if counter == 0:
-                # in_resized = []
-                # for arr in small_images_augmented:
-                    # in_resized.append(arr.repeat(8, axis=0).repeat(8, axis=1))
                 augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(5)]
                 augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
                 wandb.log({
@@ -190,3 +221,64 @@ class ImageLogger(Callback):
         ,   "train":   [wandb.Image(img_train_con)]
         ,   "learn":   [wandb.Image(img_learn_con)]
         }, commit=False)
+        
+class ImageLoggerCanny(Callback):
+    def __init__(self, config):
+        self.config = config
+    def on_epoch_end(self, epoch, logs):
+        config = self.config
+        hr_img, edge_soft = next(image_generator_canny(5, config.val_dir, config))
+        preds = self.model.predict(hr_img)
+               
+        # Output log formatting
+        out = np.concatenate([hr_img[i] for i in range(5)])
+        canny = np.concatenate([preds[i] for i in range(5)])
+        canny_soft = np.concatenate([edge_soft[i] for i in range(5)])
+            
+        wandb.log({
+             "hr": [wandb.Image(out)]
+        ,    "canny": [wandb.Image(canny)]
+        ,    "canny_soft": [wandb.Image(canny_soft)]
+        }, commit=False)
+
+def image_generator_canny(batch_size, img_dir, config):
+    """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
+    input_filenames = glob.glob(img_dir + "/*-out.jpg")
+    counter = 0
+    random.shuffle(input_filenames)
+    while True:
+            
+        hr_img = np.zeros(
+            (batch_size, config.output_width, config.output_height, 3))
+        edge_soft = np.zeros(
+            (batch_size, config.output_width, config.output_height, 1))
+        edge_soft_gray = np.zeros(
+            (batch_size, config.output_width, config.output_height, 1))
+        if counter+batch_size >= len(input_filenames):
+            counter = 0
+        for i in range(batch_size):
+            img = input_filenames[counter + i]
+            hr_img[i] = np.array(Image.open(img))
+            edge_soft_gray[i] = rgb2gray(hr_img[i])
+            
+        detector = ced.cannyEdgeDetector(edge_soft_gray, sigma=1.4, kernel_size=5, lowthreshold=0.09, highthreshold=0.17, weak_pixel=100)
+        edge_soft_list = detector.detect()
+        
+        for i in range(batch_size):
+            edge_soft[i] = edge_soft_list[i]
+        
+        if counter == 0 and img_dir == config.train_dir:
+            out = np.concatenate([hr_img[i] for i in range(5)])
+            canny = np.concatenate([edge_soft[i] for i in range(5)])
+            
+            wandb.log({
+                 "hr": [wandb.Image(out)]
+            ,    "canny": [wandb.Image(canny)]
+            }, commit=False)
+
+        hr_img    = normalize(hr_img   , config.norm0)
+        edge_soft = normalize(edge_soft, config.norm0)
+        
+        
+        yield (hr_img, edge_soft)
+        counter += batch_size
