@@ -4,6 +4,13 @@ from scipy.ndimage.filters import convolve
 from scipy import misc
 import numpy as np
 
+def rgb2gray(rgb):
+
+    r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+
+    return gray[..., np.newaxis]
+
 class cannyEdgeDetector:
     def __init__(self, imgs, sigma=1, kernel_size=5, weak_pixel=75, strong_pixel=255, lowthreshold=0.05, highthreshold=0.15):
         self.imgs = imgs

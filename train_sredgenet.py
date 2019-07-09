@@ -59,16 +59,16 @@ def create_edsr():
     #model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
     return model
 
-def create_canny():
-    input = Input(shape=(256, 256, 3))          
+def create_edge():
+    input = Input(shape=(256, 256, 3))
     model = Model(inputs=input, outputs=Canny(input, 64, 6)) #Fixed filters and nBlocks because of load weights
-    model.load_weights('canny_best.h5')
+    model.load_weights('sredgenet_canny.h5')
     #model.compile(optimizer='adam', loss='mse')
     return model
-    
+
 def create_merge():
-    input_edsr = Input(shape=(256, 256, 3))          
-    input_canny = Input(shape=(256, 256, 1))          
+    input_edsr = Input(shape=(256, 256, 3))
+    input_canny = Input(shape=(256, 256, 1))
     model = Model(inputs=[input_edsr, input_canny], outputs=Merge([input_edsr, input_canny], config.Merge_filters, config.Merge_nBlocks))
     return model
 
@@ -81,12 +81,12 @@ def create_sredgenet(edsr, canny, merge):
     model = Model(inputs=input, outputs=merge)
     model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
     return model
-    
+
 # Neural network
 edsr = create_edsr()
-canny = create_canny()  
-merge = create_merge()  
-sredgenet = create_sredgenet(edsr, canny, merge)
+edge = create_edge()
+merge = create_merge()
+sredgenet = create_sredgenet(edsr, edge, merge)
 
 print(sredgenet.summary())
 #model.load_weights('edsr.h5')
@@ -99,6 +99,3 @@ sredgenet.fit_generator(image_generator(config.batch_size, config.train_dir, con
                         mc, ImageLogger(config), WandbCallback()],
                     validation_steps=config.val_steps_per_epoch,
                     validation_data=image_generator(config.batch_size, config.val_dir, config))
-
-
-

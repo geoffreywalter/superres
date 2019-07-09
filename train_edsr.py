@@ -3,19 +3,17 @@ import glob
 import subprocess
 import os
 import gc
-from PIL import Image
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.models import Sequential, Model, load_model
-from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback, EarlyStopping, LambdaCallback, ModelCheckpoint
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import wandb
 from wandb.keras import WandbCallback
-from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator, ImageLogger
-from models import SRResNet, create_generator, create_discriminator, create_gan, EDSR
+from helpfunc import PS, perceptual_distance, image_generator, ImageLogger
+from models import EDSR
 
 
 #GPU config
@@ -71,6 +69,4 @@ model.fit_generator(image_generator(config.batch_size, config.train_dir, config)
                     validation_steps=config.val_steps_per_epoch,
                     validation_data=image_generator(config.batch_size, config.val_dir, config))
 
-#model.save_weights('edsr.h5')                    
-
-
+#model.save_weights('edsr.h5')
