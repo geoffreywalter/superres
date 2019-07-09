@@ -69,6 +69,24 @@ def Canny(input, filters, nBlocks):
     x = Conv2D(1, (3, 3), activation='tanh', padding='same') (x)
   
     return x
+
+def Merge(inputs, filters, nBlocks):
+    edsr = inputs[0]
+    edge = inputs[1]
+    
+    x = Concatenate()([edsr, edge])    
+    edsr = x = Conv2D(filters, (3, 3), padding='same') (x)
+
+    # Residual blocks
+    for i in range(nBlocks):
+        x = EDSRBlock(x, filters)
+
+    x = Conv2D(filters, (3, 3), padding='same') (x)
+    edge = Conv2D(filters, (3, 3), padding='same') (edge)
+    x = Add()([edge, edsr, x])
+     
+    x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x) 
+    return x
     
 def EEDSR(input, filters, nBlocks):
     skipRes = x = Conv2D(filters, (3, 3), padding='same') (input)
