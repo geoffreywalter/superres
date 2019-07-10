@@ -56,6 +56,7 @@ config.val_steps_per_epoch = len(
 def create_edsr():
     input = Input(shape=(32, 32, 3))
     model = Model(inputs=input, outputs=EDSR(input, config.EDSR_filters, config.EDSR_nBlocks))
+    model.load_weights('sredgenet_edsr.h5')
     #model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
     return model
 
@@ -74,6 +75,7 @@ def create_merge():
 
 def create_sredgenet(edsr, canny, merge):
     canny.trainable=False
+    # edsr.trainable=False
     input = Input(shape=(32, 32, 3))
     edsr = edsr(input)
     canny = canny(edsr)
@@ -82,11 +84,21 @@ def create_sredgenet(edsr, canny, merge):
     model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
     return model
 
+def create_edsr_edge(edsr, canny):
+    input = Input(shape=(32, 32, 3))
+    edsr = edsr(input)
+    canny = canny(edsr)
+    model = Model(inputs=input, outputs=canny)
+    return model
+
 # Neural network
 edsr = create_edsr()
 edge = create_edge()
 merge = create_merge()
 sredgenet = create_sredgenet(edsr, edge, merge)
+
+# Model to log edges
+edsr_edge = create_edsr_edge(edsr, edge)
 
 print(sredgenet.summary())
 #model.load_weights('edsr.h5')
@@ -96,6 +108,6 @@ mc = ModelCheckpoint('sredgenet.h5', monitor='val_perceptual_distance', mode='mi
 sredgenet.fit_generator(image_generator(config.batch_size, config.train_dir, config),
                     steps_per_epoch=config.steps_per_epoch,
                     epochs=config.num_epochs, callbacks=[
-                        mc, ImageLogger(config), WandbCallback()],
+                        mc, ImageLogger(config, edsr_edge), WandbCallback()],
                     validation_steps=config.val_steps_per_epoch,
                     validation_data=image_generator(config.batch_size, config.val_dir, config))

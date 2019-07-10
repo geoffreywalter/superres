@@ -162,18 +162,23 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
 
 
 class ImageLogger(Callback):
-    def __init__(self, config):
+    def __init__(self, config, edsr_edge):
         self.config = config
+        self.edsr_edge = edsr_edge
     def on_epoch_end(self, epoch, logs):
         config = self.config
         in_sample_images, out_sample_images = next(image_generator(7, config.val_dir, config, shuffle=True))
         preds = self.model.predict(in_sample_images)
+        preds_edge = self.edsr_edge.predict(in_sample_images)
+        preds_edge_con = np.concatenate([preds_edge, preds_edge, preds_edge], axis=3)
         # Simple upsampling
         in_resized = [in_sample_images[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(in_sample_images))]
 
         # To see predictions on train set
         in_sample_images_train, out_sample_images_train = next(image_generator(7, config.train_dir, config, shuffle=True, augment=False))
         preds_train = self.model.predict(in_sample_images_train)
+        preds_edge_train = self.edsr_edge.predict(in_sample_images_train)
+        preds_edge_train_con = np.concatenate([preds_edge_train, preds_edge_train, preds_edge_train], axis=3)
         in_resized_train = [in_sample_images_train[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(in_sample_images_train))]
 
         # To see learning evolution on a test image
@@ -187,9 +192,9 @@ class ImageLogger(Callback):
         in_resized_learn = [img_lr[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(img_name))]
 
         # Output log formatting
-        out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
+        out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_edge_con[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
         img_pred_con  = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
-        out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
+        out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0), denormalize(preds_edge_train_con[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
         img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
         out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
         img_learn_con = np.transpose(np.concatenate(out_learn), axes=(0, 1, 2))

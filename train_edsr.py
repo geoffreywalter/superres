@@ -32,7 +32,7 @@ config.output_height = 256
 config.output_width = 256
 config.norm0 = True
 config.name = "EDSR"
-config.filters = 192
+config.filters = 128
 config.nBlocks = 32
 
 config.val_dir = 'data/test'

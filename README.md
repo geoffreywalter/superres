@@ -9,12 +9,10 @@ Images predicted with SRDenseNet:
 - After GAN training, can save its model then use generator model only to perform SR and use metrics
 
 ### To explore
-- Use Conv2DTranspose instead of UpSampling2D
-- Log images predicted on train set
 - Add training progress on images (gif)
 - Add data augmentation examples
-- Use Edge detection model in the middle of neural network
-- Use pretrained network
+- Use VGG16 pretrained network
+- Why exploding gradients with perceptual_distance as loss function
 
 ## Notes
 - MSE gives worse performance than perceptual_distance
@@ -28,6 +26,3 @@ Images predicted with SRDenseNet:
 
 ## Ideas
 - Deconvolution and Checkerboard Artifacts https://distill.pub/2016/deconv-checkerboard/
-
-
-
