@@ -1,8 +1,11 @@
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten, LeakyReLU, Concatenate, GaussianNoise
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten, LeakyReLU, Concatenate, GaussianNoise, Lambda, MaxPooling2D, AveragePooling2D, Conv2DTranspose
 from tensorflow.keras.optimizers import Adam
 from helpfunc import PS, perceptual_distance
+from canny_edge_detector import rgb2gray
+import canny_edge_detector as ced
+import tensorflow as tf
 
 def resBlock(tens, filter_size):
     x = Conv2D(filter_size, (3, 3), padding='same') (tens)
@@ -35,6 +38,7 @@ def SRResNet(input, filters, nBlocks):
 
 def EDSRBlock(tens, filter_size):
     x = Conv2D(filter_size, (3, 3), padding='same') (tens)
+    # x = LeakyReLU(alpha=0.1)(x)
     x = Activation('relu')(x)
     x = Conv2D(filter_size, (3, 3), padding='same') (x)
     x = Lambda(lambda x: x * 0.1)(x)
@@ -59,15 +63,13 @@ def EDSR(input, filters, nBlocks):
     x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x)
     return x
 
-def Canny(input, filters, nBlocks):
-    x = Conv2D(128, (3, 3), activation='relu', padding='same') (input)
+def canny(input):
+    edge_gray = rgb2gray(input)
+    detector = ced.cannyEdgeDetector(edge_gray, sigma=1.4, kernel_size=5, lowthreshold=0.09, highthreshold=0.17, weak_pixel=100)
+    return detector.detect()
 
-    # Residual blocks
-    for i in range(nBlocks):
-        x = Conv2D(filters, (3, 3), activation='relu', padding='same') (x)
-
-    x = Conv2D(1, (3, 3), activation='tanh', padding='same') (x)
-
+def Canny(input):
+    x = Lambda(lambda x: canny(x)) (input)
     return x
 
 def Merge(inputs, filters, nBlocks):
@@ -88,6 +90,33 @@ def Merge(inputs, filters, nBlocks):
     x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x)
     return x
 
+def Attention(input, filters, nBlocks, nLayers):
+    bicubic = Lambda(lambda x: tf.image.resize_bicubic(x, (256, 256), align_corners=True)) (input)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same') (bicubic)
+    skip = x = Conv2D(32, (3, 3), activation='relu', padding='same') (x)
+
+    x = MaxPooling2D((2, 2), 2) (x)
+    skipDense1 = x = DenseBlock(x, filters, nLayers)
+    x = AveragePooling2D((2, 2), 2) (x)
+    skipDense2 = x = DenseBlock(x, filters, nLayers)
+    x = AveragePooling2D((2, 2), 2) (x)
+    skipDense3 = x = DenseBlock(x, filters, nLayers)
+    x = AveragePooling2D((2, 2), 2) (x)
+    x = DenseBlock(x, filters, nLayers)
+    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    x = Concatenate()([x, skipDense3])
+    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    x = Concatenate()([x, skipDense2])
+    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    x = Concatenate()([x, skipDense1])
+    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+
+    x = Concatenate()([x, skip])
+    x = Conv2D(32, (3, 3), activation='relu', padding='same', kernel_initializer='zeros', bias_initializer='zeros') (x)
+    x = Conv2D(3, (1, 1), activation='sigmoid', padding='same') (x)
+
+    return x
+
 def DenseBlock(tens, filter_size, nLayers):
     x = Conv2D(filter_size, (3, 3), padding='same') (tens)
     x = Activation('relu')(x)
@@ -98,7 +127,7 @@ def DenseBlock(tens, filter_size, nLayers):
     return x
 
 def SRDenseNet(input, filters, nBlocks, nLayers):
-    x = Conv2D(256, (3, 3), padding='same') (input)
+    x = Conv2D(128, (3, 3), padding='same') (input)
     con = x = Activation('relu')(x)
 
     # Dense blocks
@@ -106,13 +135,13 @@ def SRDenseNet(input, filters, nBlocks, nLayers):
         x = DenseBlock(x, filters, nLayers)
         con = Concatenate()([x, con])
 
-    # # BottleNeck Layer
-    # x = Conv2D(512, (1, 1), padding='same') (con)
-    # x = Activation('relu')(x)
+    # BottleNeck Layer
+    x = Conv2D(512, (1, 1), padding='same') (con)
+    x = Activation('relu')(x)
 
     # Sub-pixel convolution layer
     r = 8 #Upscale x8
-    x = Conv2D(3*r*r, (3, 3), padding='same') (con)
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x)
     x = Lambda(lambda x: PS(x, r))(x)
 
     x = Conv2D(3, (3, 3), activation='tanh', padding='same') (x)

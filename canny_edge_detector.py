@@ -6,7 +6,7 @@ import numpy as np
 
 def rgb2gray(rgb):
 
-    r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
+    r, g, b = rgb[:,:,:,0], rgb[:,:,:,1], rgb[:,:,:,2]
     gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
 
     return gray[..., np.newaxis]
@@ -26,15 +26,18 @@ class cannyEdgeDetector:
         self.kernel_size = kernel_size
         self.lowThreshold = lowthreshold
         self.highThreshold = highthreshold
-        return 
-    
+        self.batch_size = 10
+        return
+
     def gaussian_kernel(self, size, sigma=1):
         size = int(size) // 2
         x, y = np.mgrid[-size:size+1, -size:size+1]
         normal = 1 / (2.0 * np.pi * sigma**2)
         g =  np.exp(-((x**2 + y**2) / (2.0*sigma**2))) * normal
-        return g[..., np.newaxis]
-    
+        con = np.stack([g for i in range(self.batch_size)])
+        print(con.shape)
+        return con[..., np.newaxis]
+
     def sobel_filters(self, img):
         Kx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], np.float32)
         Ky = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]], np.float32)
@@ -46,7 +49,7 @@ class cannyEdgeDetector:
         G = G / G.max() * 255
         theta = np.arctan2(Iy, Ix)
         return (G, theta)
-    
+
 
     def non_max_suppression(self, img, D):
         M, N, C = img.shape
@@ -130,15 +133,14 @@ class cannyEdgeDetector:
                         pass
 
         return img
-    
+
     def detect(self):
-        imgs_final = []
-        for i, img in enumerate(self.imgs):    
-            self.img_smoothed = convolve(img, self.gaussian_kernel(self.kernel_size, self.sigma))
-            self.gradientMat, self.thetaMat = self.sobel_filters(self.img_smoothed)
-            self.nonMaxImg = self.non_max_suppression(self.gradientMat, self.thetaMat)
-            self.thresholdImg = self.threshold(self.nonMaxImg)
-            img_final = self.hysteresis(self.thresholdImg)
-            self.imgs_final.append(img_final)
+        imgs_final = np.zeros((self.batch_size, 256, 256, 1))
+        # for i, img in enumerate(self.imgs):
+        self.img_smoothed = convolve(self.imgs, self.gaussian_kernel(self.kernel_size, self.sigma))
+        self.gradientMat, self.thetaMat = self.sobel_filters(self.img_smoothed)
+        self.nonMaxImg = self.non_max_suppression(self.gradientMat, self.thetaMat)
+        self.thresholdImg = self.threshold(self.nonMaxImg)
+        self.imgs_final = self.hysteresis(self.thresholdImg)
 
         return self.imgs_final

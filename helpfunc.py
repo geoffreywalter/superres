@@ -106,14 +106,6 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                         #zoom_range=0.2)
 
     while True:
-        if img_dir == config.train_dir and augment:
-            # sel_custom = random.randint(1, 4) == 3
-            # if sel_custom:
-                # image_datagen = ImageDataGenerator(**data_gen_args_cust)
-                # print(data_gen_args_cust)
-            # else:
-            image_datagen = ImageDataGenerator(**data_gen_args)
-                # print(data_gen_args)
 
         small_images = np.zeros(
             (batch_size, config.input_width, config.input_height, 3))
@@ -128,6 +120,13 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                 Image.open(img.replace("-in.jpg", "-out.jpg")))
 
         if img_dir == config.train_dir and augment:
+            sel_custom = random.randint(1, 4) == 3 and config.custom_aug
+            if sel_custom:
+                image_datagen = ImageDataGenerator(**data_gen_args_cust)
+                #print(data_gen_args_cust)
+            else:
+                image_datagen = ImageDataGenerator(**data_gen_args)
+                # print(data_gen_args)
             seed = random.randint(1, 100000)
             gen0 = image_datagen.flow(small_images, batch_size=config.batch_size, shuffle=False, seed=seed)
             gen1 = image_datagen.flow(large_images, batch_size=config.batch_size, shuffle=False, seed=seed)
@@ -136,8 +135,8 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
             large_images_augmented = normalize(large_images_augmented, config.norm0)
 
             #small_image_resized = resize(large_images_augmented, (config.batch_size, config.input_width, config.input_height, 3), preserve_range=True, order=1, anti_aliasing=False)
-            # if sel_custom:
-                # small_images_augmented = resize(large_images_augmented, (config.batch_size, config.input_width, config.input_height, 3), preserve_range=True, order=1, anti_aliasing=False)
+            if sel_custom:
+                small_images_augmented = resize(large_images_augmented, (config.batch_size, config.input_width, config.input_height, 3), preserve_range=True, order=1, anti_aliasing=False)
 
             # totalerr = 0
             # for i in range(config.batch_size):
@@ -162,23 +161,22 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
 
 
 class ImageLogger(Callback):
-    def __init__(self, config, edsr_edge):
+    def __init__(self, config, reconstruction, attention):
         self.config = config
-        self.edsr_edge = edsr_edge
+        self.reconstruction = reconstruction
+        self.attention = attention
     def on_epoch_end(self, epoch, logs):
         config = self.config
+        reconstruction = self.reconstruction
+        attention = self.attention
         in_sample_images, out_sample_images = next(image_generator(7, config.val_dir, config, shuffle=True))
         preds = self.model.predict(in_sample_images)
-        preds_edge = self.edsr_edge.predict(in_sample_images)
-        preds_edge_con = np.concatenate([preds_edge, preds_edge, preds_edge], axis=3)
         # Simple upsampling
         in_resized = [in_sample_images[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(in_sample_images))]
 
         # To see predictions on train set
         in_sample_images_train, out_sample_images_train = next(image_generator(7, config.train_dir, config, shuffle=True, augment=False))
         preds_train = self.model.predict(in_sample_images_train)
-        preds_edge_train = self.edsr_edge.predict(in_sample_images_train)
-        preds_edge_train_con = np.concatenate([preds_edge_train, preds_edge_train, preds_edge_train], axis=3)
         in_resized_train = [in_sample_images_train[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(in_sample_images_train))]
 
         # To see learning evolution on a test image
@@ -191,13 +189,18 @@ class ImageLogger(Callback):
         preds_learn = self.model.predict(img_lr)
         in_resized_learn = [img_lr[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(img_name))]
 
+        # Intermediate logging of mask
+        preds_rec = reconstruction.predict(in_sample_images)
+        preds_att = attention.predict(in_sample_images)
+
         # Output log formatting
-        out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_edge_con[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
+        out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_rec[i], config.norm0), denormalize(preds_att[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
         img_pred_con  = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
-        out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0), denormalize(preds_edge_train_con[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
+        out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
         img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
         out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
         img_learn_con = np.transpose(np.concatenate(out_learn), axes=(0, 1, 2))
+
 
         # #Create gif for training
         # if epoch == 0:

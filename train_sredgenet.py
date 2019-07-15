@@ -62,9 +62,7 @@ def create_edsr():
 
 def create_edge():
     input = Input(shape=(256, 256, 3))
-    model = Model(inputs=input, outputs=Canny(input, 64, 6)) #Fixed filters and nBlocks because of load weights
-    model.load_weights('sredgenet_canny.h5')
-    #model.compile(optimizer='adam', loss='mse')
+    model = Model(inputs=input, outputs=Canny(input)) #Fixed filters and nBlocks because of load weights
     return model
 
 def create_merge():
