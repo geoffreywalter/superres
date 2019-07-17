@@ -103,16 +103,19 @@ def Attention(input, filters, nBlocks, nLayers):
     skipDense3 = x = DenseBlock(x, filters, nLayers)
     x = AveragePooling2D((2, 2), 2) (x)
     x = DenseBlock(x, filters, nLayers)
+
     x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
     x = Concatenate()([x, skipDense3])
     x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
     x = Concatenate()([x, skipDense2])
+    x = DenseBlock(x, filters, nLayers)
     x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
     x = Concatenate()([x, skipDense1])
+    x = DenseBlock(x, filters, nLayers)
     x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
 
     x = Concatenate()([x, skip])
-    x = Conv2D(32, (3, 3), activation='relu', padding='same', kernel_initializer='zeros', bias_initializer='zeros') (x)
+    x = Conv2D(32, (3, 3), activation='relu', padding='same') (x)
     x = Conv2D(3, (1, 1), activation='sigmoid', padding='same') (x)
 
     return x

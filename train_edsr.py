@@ -33,8 +33,8 @@ config.output_width = 256
 config.norm0 = True
 config.custom_aug = False
 config.name = "EDSR"
-config.filters = 192
-config.nBlocks = 32
+config.filters = 128
+config.nBlocks = 16
 
 config.val_dir = 'data/test'
 config.train_dir = 'data/train'
@@ -54,7 +54,7 @@ config.val_steps_per_epoch = len(
 input1 = Input(shape=(config.input_height, config.input_width, 3), dtype='float32')
 model = Model(inputs=input1, outputs=EDSR(input1, config.filters, config.nBlocks))
 
-print(model.summary())
+#print(model.summary())
 #model.load_weights('edsr.h5')
 
 #es = EarlyStopping(monitor='val_perceptual_distance', mode='min', verbose = 1, patience=2)

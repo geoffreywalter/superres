@@ -78,9 +78,10 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
     counter = 0
     printed = False
     if shuffle:
+        random.seed(2)
         random.shuffle(input_filenames)
-        #Data augmentation
-        data_gen_args_cust = dict(#featurewise_center=True,
+    #Data augmentation
+    data_gen_args_cust = dict(#featurewise_center=True,
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
                         rotation_range=90,
@@ -92,16 +93,16 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                         horizontal_flip=True,
                         shear_range=0.2,
                         zoom_range=0.2)
-        data_gen_args = dict(#featurewise_center=True,
+    data_gen_args = dict()#featurewise_center=True,
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
                         #rotation_range=90,
-                        brightness_range=(0.5, 1.0), # 0 is black, 1 is same image
-                        channel_shift_range=30, # value in [-channel_shift_range, channel_shift_range] added to each channel
+                        #brightness_range=(0.5, 1.0), # 0 is black, 1 is same image
+                        #channel_shift_range=30, # value in [-channel_shift_range, channel_shift_range] added to each channel
                         #width_shift_range=0.2,
                         #height_shift_range=0.2,
-                        vertical_flip=True,
-                        horizontal_flip=True)
+                        #vertical_flip=True,
+                        #horizontal_flip=True)
                         #shear_range=0.2,
                         #zoom_range=0.2)
 
@@ -145,12 +146,12 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                 # totalerr += err
             # print("===Resizing difference=" + str(totalerr/config.batch_size))
 
-            if counter == 0:
-                augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(5)]
-                augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
-                wandb.log({
-                    "augment": [wandb.Image(augment_con)]
-                }, commit=False)
+            # if counter == 0:
+            # augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(2)]
+            # augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
+            # wandb.log({
+            #     "augment": [wandb.Image(augment_con)]
+            # }, commit=True)
 
             yield (small_images_augmented, large_images_augmented)
         else:
@@ -161,7 +162,7 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
 
 
 class ImageLogger(Callback):
-    def __init__(self, config, reconstruction, attention):
+    def __init__(self, config, reconstruction=0, attention=0):
         self.config = config
         self.reconstruction = reconstruction
         self.attention = attention
@@ -192,14 +193,45 @@ class ImageLogger(Callback):
         # Intermediate logging of mask
         preds_rec = reconstruction.predict(in_sample_images)
         preds_att = attention.predict(in_sample_images)
+        preds_learn_rec = reconstruction.predict(img_lr)
+        preds_learn_att = attention.predict(img_lr)
 
         # Output log formatting
+        #print(denormalize(preds[0], config.norm0).astype("uint8"))
         out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_rec[i], config.norm0), denormalize(preds_att[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
         img_pred_con  = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
         out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
         img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
-        out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
+        out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0), denormalize(preds_learn_rec[i], config.norm0), denormalize(preds_learn_att[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
         img_learn_con = np.transpose(np.concatenate(out_learn), axes=(0, 1, 2))
+        #
+        # # Test debug
+        # weights_att, bias_att = attention.layers[-1].get_weights()
+        # weights_rec, bias_rec = reconstruction.layers[-1].get_weights()
+        # print(weights_rec[:,:,0,0])
+        # print(bias_rec)
+        # print(np.concatenate([weights_att[:,:,i,0] for i in range(32)]))
+        # print(bias_att)
+        # grads = K.gradients(loss, model.input)[0]
+        # print(grads)
+        # np.savetxt("debug_rec.txt"%epoch, weights[:,:,0,0], fmt='%.2f')
+        # np.savetxt("debug_att%d.txt"%epoch, preds_att[0,:,:,0], fmt='%.2f')
+        # np.savetxt("debug2.txt", denormalize(preds[0,:,:,1], config.norm0), fmt='%.2f')
+        # np.savetxt("debug3.txt", denormalize(preds[0,:,:,1], config.norm0).astype("uint8"), fmt='%.2f')
+
+        # zeros = np.zeros((config.output_width, config.output_height, 3))
+        # ones = np.ones((config.output_width, config.output_height, 3))
+        # grey = ones / 2.0
+        # zeros_ones = np.concatenate([denormalize(zeros, config.norm0), denormalize(grey, config.norm0), denormalize(ones, config.norm0)])
+        # ones_ones = np.concatenate([denormalize(ones, config.norm0), denormalize(grey, config.norm0), denormalize(ones, config.norm0)])
+        # wandb.log({
+        #     "zeros_ones": [wandb.Image(zeros_ones, caption="zeros_ones")]
+        # ,   "ones_ones": [wandb.Image(ones_ones, caption="ones_ones")]
+        # }, commit=False)
+
+        # img_pred_con_pil = Image.fromarray(img_pred_con.astype("uint8"), mode='RGB')
+        # img_train_con_pil = Image.fromarray(img_train_con.astype("uint8"), mode='RGB')
+        # img_learn_con_pil = Image.fromarray(img_learn_con.astype("uint8"), mode='RGB')
 
 
         # #Create gif for training

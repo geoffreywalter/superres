@@ -19,6 +19,7 @@ Images predicted with SRDenseNet:
 - Try EDSR without final convolution **Seems better with final convolution layer**
 - Scale all pixel values to the range [-1, 1] **Seems worse than [0, 1], maybe because of the use of tanh instead of relu**
 - Try LapSRN (good for x8) **Seems to have poor performance**
+- Gradient clipping to avoid infinity values https://machinelearningmastery.com/how-to-avoid-exploding-gradients-in-neural-networks-with-gradient-clipping/
 
 ## Optimization of network
 - Tips and tricks to make GANs work https://github.com/soumith/ganhacks

@@ -12,6 +12,7 @@ from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNorm
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback, EarlyStopping, LambdaCallback, ModelCheckpoint
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.optimizers import Adam
 import wandb
 from wandb.keras import WandbCallback
 from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator, ImageLogger
@@ -81,7 +82,7 @@ def create_merge(reconstruction, attention):
     out2 = Add() ([out1, bicubic])
 
     model = Model(inputs=input, outputs=out2)
-    model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
+    model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
     return model
 
 # Neural network
@@ -89,19 +90,19 @@ reconstruction = create_reconstruction()
 attention = create_attention()
 model = create_merge(reconstruction, attention)
 
-print(reconstruction.summary())
-print("^^^ reconstruction ^^^")
-print(attention.summary())
-print("^^^ attention ^^^")
-print(model.summary())
-print("^^^ model ^^^")
+# print(reconstruction.summary())
+# print("^^^ reconstruction ^^^")
+# print(attention.summary())
+# print("^^^ attention ^^^")
+# print(model.summary())
+# print("^^^ model ^^^")
 #model.load_weights('srdensenet.h5')
 
 #es = EarlyStopping(monitor='val_perceptual_distance', mode='min', verbose = 1, patience=2)
 mc = ModelCheckpoint('attnet.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
 
+# adam = Adam(clipvalue=7500.0)
 ##DONT ALTER metrics=[perceptual_distance]
-model.compile(optimizer='adam', loss=[perceptual_distance], metrics=[perceptual_distance])
 
 model.fit_generator(image_generator(config.batch_size, config.train_dir, config),
                     steps_per_epoch=config.steps_per_epoch,
