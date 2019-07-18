@@ -76,9 +76,7 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
     """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
     input_filenames = glob.glob(img_dir + "/*-in.jpg")
     counter = 0
-    printed = False
     if shuffle:
-        random.seed(2)
         random.shuffle(input_filenames)
     #Data augmentation
     data_gen_args_cust = dict(#featurewise_center=True,
@@ -93,21 +91,20 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                         horizontal_flip=True,
                         shear_range=0.2,
                         zoom_range=0.2)
-    data_gen_args = dict()#featurewise_center=True,
+    data_gen_args = dict(#featurewise_center=True,
                         #featurewise_std_normalization=True,
                         #zca_whitening=True,
                         #rotation_range=90,
-                        #brightness_range=(0.5, 1.0), # 0 is black, 1 is same image
-                        #channel_shift_range=30, # value in [-channel_shift_range, channel_shift_range] added to each channel
+                        brightness_range=(0.5, 1.0), # 0 is black, 1 is same image
+                        channel_shift_range=30, # value in [-channel_shift_range, channel_shift_range] added to each channel
                         #width_shift_range=0.2,
                         #height_shift_range=0.2,
-                        #vertical_flip=True,
-                        #horizontal_flip=True)
+                        vertical_flip=True,
+                        horizontal_flip=True)
                         #shear_range=0.2,
                         #zoom_range=0.2)
 
     while True:
-
         small_images = np.zeros(
             (batch_size, config.input_width, config.input_height, 3))
         large_images = np.zeros(
@@ -146,12 +143,13 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                 # totalerr += err
             # print("===Resizing difference=" + str(totalerr/config.batch_size))
 
-            # if counter == 0:
-            # augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(2)]
-            # augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
-            # wandb.log({
-            #     "augment": [wandb.Image(augment_con)]
-            # }, commit=True)
+            if counter == 0:
+                augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(5)]
+                augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
+                #np.savetxt("debug_aug.txt", augment_con[:,:,0], fmt='%.2f')
+                wandb.log({
+                    "augment": [wandb.Image(augment_con)]
+                }, commit=False)
 
             yield (small_images_augmented, large_images_augmented)
         else:
@@ -190,21 +188,26 @@ class ImageLogger(Callback):
         preds_learn = self.model.predict(img_lr)
         in_resized_learn = [img_lr[i].repeat(8, axis=0).repeat(8, axis=1) for i in range(len(img_name))]
 
-        # Intermediate logging of mask
+        # Intermediate logging of attention mask
         preds_rec = reconstruction.predict(in_sample_images)
         preds_att = attention.predict(in_sample_images)
         preds_learn_rec = reconstruction.predict(img_lr)
         preds_learn_att = attention.predict(img_lr)
 
         # Output log formatting
-        #print(denormalize(preds[0], config.norm0).astype("uint8"))
         out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_rec[i], config.norm0), denormalize(preds_att[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
         img_pred_con  = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
         out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
         img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
         out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0), denormalize(preds_learn_rec[i], config.norm0), denormalize(preds_learn_att[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
         img_learn_con = np.transpose(np.concatenate(out_learn), axes=(0, 1, 2))
-        #
+
+        img_pred_con_pil = Image.fromarray(np.clip(img_pred_con, 0, 255).astype("uint8"), mode='RGB')
+        img_train_con_pil = Image.fromarray(np.clip(img_train_con, 0, 255).astype("uint8"), mode='RGB')
+        img_learn_con_pil = Image.fromarray(np.clip(img_learn_con, 0, 255).astype("uint8"), mode='RGB')
+        np.savetxt("debug_rec.txt", img_pred_con[:,:,0], fmt='%.2f')
+
+
         # # Test debug
         # weights_att, bias_att = attention.layers[-1].get_weights()
         # weights_rec, bias_rec = reconstruction.layers[-1].get_weights()
@@ -229,37 +232,32 @@ class ImageLogger(Callback):
         # ,   "ones_ones": [wandb.Image(ones_ones, caption="ones_ones")]
         # }, commit=False)
 
-        # img_pred_con_pil = Image.fromarray(img_pred_con.astype("uint8"), mode='RGB')
-        # img_train_con_pil = Image.fromarray(img_train_con.astype("uint8"), mode='RGB')
-        # img_learn_con_pil = Image.fromarray(img_learn_con.astype("uint8"), mode='RGB')
 
+        #Create gif for training
+        if epoch == 0:
+            Image.fromarray(np.clip(img_learn_con, 0, 255).astype("uint8")).save('train.gif', format='GIF', save_all=True, duration=500, loop=0)
+        else:
+            gif_pil = Image.open('train.gif')
+            gif_frames = []
+            for frame in range(0, gif_pil.n_frames):
+                gif_pil.seek(frame)
+                gif_frames.append([np.array(gif_pil), gif_pil.getpalette()])
+            print("len gif_frames=" + str(len(gif_frames)))
 
-        # #Create gif for training
-        # if epoch == 0:
-            # Image.fromarray(img_learn_con.astype("uint8")).save('train.gif', format='GIF', save_all=True, duration=500, loop=0)
-        # else:
-            # gif_pil = Image.open('train.gif')
-            # gif_frames = []
-            # for frame in range(0, gif_pil.n_frames):
-                # gif_pil.seek(frame)
-                # gif_frames.append([np.array(gif_pil), gif_pil.getpalette()])
-            # print("len gif_frames=" + str(len(gif_frames)))
+            # gif_frames_pil = [Image.fromarray(gif_frames[i].astype("uint8")) for i in range(len(gif_frames))]
+            gif_frames_pil = []
+            for f, palette in gif_frames:
+                image = Image.fromarray(f.astype("uint8"))
+                image.putpalette(palette)
+                gif_frames_pil.append(image)
 
-            # # gif_frames_pil = [Image.fromarray(gif_frames[i].astype("uint8")) for i in range(len(gif_frames))]
-            # gif_frames_pil = []
-            # for f, palette in gif_frames:
-                # image = Image.fromarray(f.astype("uint8"))
-                # image.putpalette(palette)
-                # gif_frames_pil.append(image)
-
-            # gif_frames_pil.append(Image.fromarray(img_learn_con.astype("uint8")))
-            # gif_frames_pil[0].save('train.gif', format='GIF', append_images=gif_frames_pil[1:], save_all=True, duration=500, loop=0)
-
+            gif_frames_pil.append(Image.fromarray(np.clip(img_learn_con, 0, 255).astype("uint8")))
+            gif_frames_pil[0].save('train.gif', format='GIF', append_images=gif_frames_pil[1:], save_all=True, duration=500, loop=0)
 
         wandb.log({
-            "predict": [wandb.Image(img_pred_con)]
-        ,   "train":   [wandb.Image(img_train_con)]
-        ,   "learn":   [wandb.Image(img_learn_con)]
+            "predict": [wandb.Image(img_pred_con_pil)]
+        ,   "train":   [wandb.Image(img_train_con_pil)]
+        ,   "learn":   [wandb.Image(img_learn_con_pil)]
         }, commit=False)
 
 class ImageLoggerCanny(Callback):

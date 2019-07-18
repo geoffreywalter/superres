@@ -37,7 +37,7 @@ config.norm0 = True
 config.name = "AttNet"
 config.reconstructionNN = "EDSR"
 config.filters = 128
-config.nBlocks = 16
+config.nBlocks = 32
 config.custom_aug = False
 config.Att_filters = 16
 config.Att_nBlocks = 10
@@ -80,9 +80,11 @@ def create_merge(reconstruction, attention):
 
     out1 = Multiply() ([reconstruction_out, attention_out])
     out2 = Add() ([out1, bicubic])
+    #out3 = Lambda(lambda x: K.clip(x, 0.0, 1.0)) (out2)
 
     model = Model(inputs=input, outputs=out2)
-    model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
+    adam = Adam(epsilon=0.1)
+    model.compile(optimizer=adam, loss=[perceptual_distance], metrics=[perceptual_distance])
     return model
 
 # Neural network
@@ -94,8 +96,8 @@ model = create_merge(reconstruction, attention)
 # print("^^^ reconstruction ^^^")
 # print(attention.summary())
 # print("^^^ attention ^^^")
-# print(model.summary())
-# print("^^^ model ^^^")
+print(model.summary())
+print("^^^ model ^^^")
 #model.load_weights('srdensenet.h5')
 
 #es = EarlyStopping(monitor='val_perceptual_distance', mode='min', verbose = 1, patience=2)
@@ -105,8 +107,8 @@ mc = ModelCheckpoint('attnet.h5', monitor='val_perceptual_distance', mode='min',
 ##DONT ALTER metrics=[perceptual_distance]
 
 model.fit_generator(image_generator(config.batch_size, config.train_dir, config),
-                    steps_per_epoch=config.steps_per_epoch,
+                    steps_per_epoch=1,
                     epochs=config.num_epochs, callbacks=[
                         mc, ImageLogger(config, reconstruction, attention), WandbCallback()],
-                    validation_steps=config.val_steps_per_epoch,
+                    validation_steps=1,
                     validation_data=image_generator(config.batch_size, config.val_dir, config))

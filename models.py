@@ -41,7 +41,7 @@ def EDSRBlock(tens, filter_size):
     # x = LeakyReLU(alpha=0.1)(x)
     x = Activation('relu')(x)
     x = Conv2D(filter_size, (3, 3), padding='same') (x)
-    x = Lambda(lambda x: x * 0.1)(x)
+    x = Lambda(lambda x: x * 0.2)(x)
     x = Add()([x, tens])
     return x
 
@@ -92,20 +92,16 @@ def Merge(inputs, filters, nBlocks):
 
 def Attention(input, filters, nBlocks, nLayers):
     bicubic = Lambda(lambda x: tf.image.resize_bicubic(x, (256, 256), align_corners=True)) (input)
-    x = Conv2D(32, (3, 3), activation='relu', padding='same') (bicubic)
-    skip = x = Conv2D(32, (3, 3), activation='relu', padding='same') (x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same') (bicubic)
+    skip = x = Conv2D(64, (3, 3), activation='relu', padding='same') (x)
 
     x = MaxPooling2D((2, 2), 2) (x)
     skipDense1 = x = DenseBlock(x, filters, nLayers)
     x = AveragePooling2D((2, 2), 2) (x)
     skipDense2 = x = DenseBlock(x, filters, nLayers)
     x = AveragePooling2D((2, 2), 2) (x)
-    skipDense3 = x = DenseBlock(x, filters, nLayers)
-    x = AveragePooling2D((2, 2), 2) (x)
     x = DenseBlock(x, filters, nLayers)
 
-    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
-    x = Concatenate()([x, skipDense3])
     x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
     x = Concatenate()([x, skipDense2])
     x = DenseBlock(x, filters, nLayers)
@@ -115,7 +111,7 @@ def Attention(input, filters, nBlocks, nLayers):
     x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
 
     x = Concatenate()([x, skip])
-    x = Conv2D(32, (3, 3), activation='relu', padding='same') (x)
+    x = Conv2D(64, (3, 3), activation='relu', padding='same') (x)
     x = Conv2D(3, (1, 1), activation='sigmoid', padding='same') (x)
 
     return x
