@@ -11,16 +11,16 @@ import numpy as np
     # b = y_true[ :, :, 2] - y_pred[ :, :, 2]
     # return np.mean(np.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
 
-# def perceptual_distance_matrix(y_true, y_pred):
-#     """Calculate perceptual distance, DO NOT ALTER"""
-#     rmean = (y_true[ :, :, 0] + y_pred[ :, :, 0]) / 2
-#     r = y_true[ :, :, 0] - y_pred[ :, :, 0]
-#     g = y_true[ :, :, 1] - y_pred[ :, :, 1]
-#     b = y_true[ :, :, 2] - y_pred[ :, :, 2]
-#     res = np.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256))
-#     #Max difference is sqrt(8) * 255
-#     out = np.multiply((res < 220), res)
-#     return out
+def perceptual_distance_matrix(y_true, y_pred):
+    """Calculate perceptual distance, DO NOT ALTER"""
+    rmean = (y_true[ :, :, 0] + y_pred[ :, :, 0]) / 2
+    r = y_true[ :, :, 0] - y_pred[ :, :, 0]
+    g = y_true[ :, :, 1] - y_pred[ :, :, 1]
+    b = y_true[ :, :, 2] - y_pred[ :, :, 2]
+    res = np.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256))
+    # #Max difference is sqrt(8) * 255
+    # out = np.multiply((res < 220), res)
+    return res
 
 # zero = np.zeros((256, 256, 3))
 # ones = np.ones((256, 256, 3))
@@ -45,22 +45,44 @@ import numpy as np
 # img_out.save("srdensenet_sample_test_reshaped.jpg")
 
 # Creating image with last column as perceptual_distance
-img = np.zeros((3*256, 5*256, 3))
-img = np.asarray(Image.open("srdensenet_sample_test_reshaped.jpg"))
-img_lines = []
-img_lines = np.split(img, 5, axis=0)
-perc_mat = []
+# img = np.zeros((3*256, 5*256, 3))
+# img = np.asarray(Image.open("srdensenet_sample_test_reshaped.jpg"))
+# img_lines = []
+# img_lines = np.split(img, 5, axis=0)
+# perc_mat = []
+#
+# for i in range(5):
+#     img_col = []
+#     img_col = np.split(img_lines[i], 3, axis=1)
+#     perc_mat.append(perceptual_distance_matrix(img_col[2], img_col[1]))
+#
+# perc_mat_con = np.concatenate(perc_mat, axis=0)
+# perc_mat_con_3 = np.stack((perc_mat_con,)*3, axis=-1)
+# print(perc_mat_con_3.shape)
+# print(img.shape)
+#
+# img_out = np.concatenate([img, perc_mat_con_3], axis=1)
+# perc_mat_img = Image.fromarray(img_out.astype("uint8"))
+# perc_mat_img.save("perc_img.jpg")
 
-for i in range(5):
-    img_col = []
-    img_col = np.split(img_lines[i], 3, axis=1)
-    perc_mat.append(perceptual_distance_matrix(img_col[2], img_col[1]))
+input_filenames = glob.glob('data/train' + "/*-out.jpg")
+for i in range(len(input_filenames)):
+    large_image = np.zeros((256, 256, 3))
+    img = input_filenames[i]
+    large_image = np.array(Image.open(img))
+    isnan = np.isnan(large_image).any()
+    if isnan: print(isnan)
+    large_image = large_image / 255.0
+    isnan = np.isnan(large_image).any()
+    if isnan: print(isnan)
 
-perc_mat_con = np.concatenate(perc_mat, axis=0)
-perc_mat_con_3 = np.stack((perc_mat_con,)*3, axis=-1)
-print(perc_mat_con_3.shape)
-print(img.shape)
-
-img_out = np.concatenate([img, perc_mat_con_3], axis=1)
-perc_mat_img = Image.fromarray(img_out.astype("uint8"))
-perc_mat_img.save("perc_img.jpg")
+input_filenames = glob.glob('data/train' + "/*-in.jpg")
+for i in range(len(input_filenames)):
+    small_image = np.zeros((32, 32, 3))
+    img = input_filenames[i]
+    small_image = np.array(Image.open(img))
+    isnan = np.isnan(small_image).any()
+    if isnan: print(isnan)
+    small_image = small_image / 255.0
+    isnan = np.isnan(small_image).any()
+    if isnan: print(isnan)
