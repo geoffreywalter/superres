@@ -190,16 +190,16 @@ class ImageLogger(Callback):
 
         # Intermediate logging of attention mask
         preds_rec = reconstruction.predict(in_sample_images)
-        preds_att = attention.predict(in_sample_images)
+        preds_att = np.repeat(attention.predict(in_sample_images), 3, axis=-1)
         preds_learn_rec = reconstruction.predict(img_lr)
-        preds_learn_att = attention.predict(img_lr)
+        preds_learn_att = np.repeat(attention.predict(img_lr), 3, axis=-1)
 
         # Output log formatting
-        out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_rec[i], config.norm0), denormalize(preds_att[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
+        out_pred      = [np.concatenate([denormalize(in_resized[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images[i], config.norm0), denormalize(preds_rec[i], not config.norm0), denormalize(preds_att[i], config.norm0)], axis=1) for i, o in enumerate(preds)]
         img_pred_con  = np.transpose(np.concatenate(out_pred), axes=(0, 1, 2))
         out_train     = [np.concatenate([denormalize(in_resized_train[i], config.norm0), denormalize(o, config.norm0), denormalize(out_sample_images_train[i], config.norm0)], axis=1) for i, o in enumerate(preds_train)]
         img_train_con = np.transpose(np.concatenate(out_train), axes=(0, 1, 2))
-        out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0), denormalize(preds_learn_rec[i], config.norm0), denormalize(preds_learn_att[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
+        out_learn     = [np.concatenate([denormalize(in_resized_learn[i], config.norm0), denormalize(o, config.norm0), denormalize(img_hr[i], config.norm0), denormalize(preds_learn_rec[i], not config.norm0), denormalize(preds_learn_att[i], config.norm0)], axis=1) for i, o in enumerate(preds_learn)]
         img_learn_con = np.transpose(np.concatenate(out_learn), axes=(0, 1, 2))
 
         img_pred_con_pil = Image.fromarray(np.clip(img_pred_con, 0, 255).astype("uint8"), mode='RGB')
@@ -242,15 +242,11 @@ class ImageLogger(Callback):
             for frame in range(0, gif_pil.n_frames):
                 gif_pil.seek(frame)
                 gif_frames.append([np.array(gif_pil), gif_pil.getpalette()])
-            print("len gif_frames=" + str(len(gif_frames)))
-
-            # gif_frames_pil = [Image.fromarray(gif_frames[i].astype("uint8")) for i in range(len(gif_frames))]
             gif_frames_pil = []
             for f, palette in gif_frames:
                 image = Image.fromarray(f.astype("uint8"))
                 image.putpalette(palette)
                 gif_frames_pil.append(image)
-
             gif_frames_pil.append(Image.fromarray(np.clip(img_learn_con, 0, 255).astype("uint8")))
             gif_frames_pil[0].save('train.gif', format='GIF', append_images=gif_frames_pil[1:], save_all=True, duration=500, loop=0)
 

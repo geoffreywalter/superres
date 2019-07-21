@@ -41,7 +41,7 @@ def EDSRBlock(tens, filter_size):
     # x = LeakyReLU(alpha=0.1)(x)
     x = Activation('relu')(x)
     x = Conv2D(filter_size, (3, 3), padding='same') (x)
-    x = Lambda(lambda x: x * 0.2)(x)
+    x = Lambda(lambda x: x * 0.1)(x)
     x = Add()([x, tens])
     return x
 
@@ -112,7 +112,7 @@ def Attention(input, filters, nBlocks, nLayers):
 
     x = Concatenate()([x, skip])
     x = Conv2D(64, (3, 3), activation='relu', padding='same') (x)
-    x = Conv2D(3, (1, 1), activation='sigmoid', padding='same') (x)
+    x = Conv2D(1, (1, 1), activation='sigmoid', padding='same') (x)
 
     return x
 
