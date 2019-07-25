@@ -102,13 +102,26 @@ def Attention(input, filters, nBlocks, nLayers):
     x = AveragePooling2D((2, 2), 2) (x)
     x = DenseBlock(x, filters, nLayers)
 
-    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    # x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    # x = Concatenate()([x, skipDense2])
+    # x = DenseBlock(x, filters, nLayers)
+    # x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    # x = Concatenate()([x, skipDense1])
+    # x = DenseBlock(x, filters, nLayers)
+    # x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+
+    r = 2
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x)
+    x = Lambda(lambda x: PS(x, r))(x)
+
     x = Concatenate()([x, skipDense2])
     x = DenseBlock(x, filters, nLayers)
-    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x)
+    x = Lambda(lambda x: PS(x, r))(x)
     x = Concatenate()([x, skipDense1])
     x = DenseBlock(x, filters, nLayers)
-    x = Conv2DTranspose(filters, (3, 3), strides=(2, 2), padding='same') (x)
+    x = Conv2D(3*r*r, (3, 3), padding='same') (x)
+    x = Lambda(lambda x: PS(x, r))(x)
 
     x = Concatenate()([x, skip])
     x = Conv2D(64, (3, 3), activation='relu', padding='same') (x)
@@ -156,7 +169,7 @@ def create_discriminator():
     input = Input(shape=(256, 256, 3))
 
     #normalization from [-1, 1] to [0, 1]
-    x = Lambda(lambda x: (x + 1.0) / 2.0) (input)
+    #x = Lambda(lambda x: (x + 1.0) / 2.0) (input)
 
     x = Conv2D(64, (3, 3), padding='same') (x)
     x = LeakyReLU(alpha=0.2)(x)

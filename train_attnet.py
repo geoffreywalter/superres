@@ -81,7 +81,7 @@ def create_merge(reconstruction, attention):
     #out3 = Lambda(lambda x: K.clip(x, 0.0, 1.0)) (out2)
 
     model = Model(inputs=input, outputs=out2)
-    adam = Adam(epsilon=0.1)
+    adam = Adam(epsilon=1)#, lr=0.001)#, decay=(1/2)**(1.0/100.0))
     model.compile(optimizer=adam, loss=[perceptual_distance], metrics=[perceptual_distance])
     return model
 
@@ -96,7 +96,8 @@ model = create_merge(reconstruction, attention)
 # print("^^^ attention ^^^")
 print(model.summary())
 print("^^^ model ^^^")
-model.load_weights('attnet_250.h5')
+
+model.load_weights('attnet_258.h5')
 
 mc = ModelCheckpoint('attnet.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
 
