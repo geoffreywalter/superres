@@ -168,13 +168,10 @@ def create_generator():
 def create_discriminator():
     input = Input(shape=(256, 256, 3))
 
-    #normalization from [-1, 1] to [0, 1]
-    #x = Lambda(lambda x: (x + 1.0) / 2.0) (input)
-
-    x = Conv2D(64, (3, 3), padding='same') (x)
+    x = Conv2D(64, (3, 3), padding='same') (input)
     x = LeakyReLU(alpha=0.2)(x)
 
-    x = Conv2D(64, (3, 3), strides=2, padding='same') (input)
+    x = Conv2D(64, (3, 3), strides=2, padding='same') (x)
     x = BatchNormalization()(x)
     x = LeakyReLU(alpha=0.2)(x)
 
@@ -208,7 +205,7 @@ def create_discriminator():
     x = Dense(1) (x)
     x = Activation('sigmoid')(x)
 
-    model = Model(inputs=input, outputs=x)
+    model = Model(inputs=input, outputs=x, name="discriminator")
     model.compile(loss='binary_crossentropy', optimizer=Adam(1e-4, 0.9))
     return model
 
@@ -217,6 +214,9 @@ def create_gan(generator, discriminator):
     gan_input = Input(shape=(32, 32, 3))
     x = generator(gan_input)
     gan_output= discriminator(x)
-    gan = Model(inputs=gan_input, outputs=gan_output)
-    gan.compile(loss='binary_crossentropy', optimizer=Adam(1e-5, 0.9), metrics=['acc'])
+    gan = Model(inputs=gan_input, outputs=[x, gan_output], name="gan")
+    loss_funcs = {"generator":'mae', "discriminator":'binary_crossentropy'}
+    loss_weights = {"generator":1., "discriminator":1e-3}
+    metrics = {"generator":perceptual_distance}
+    gan.compile(loss=loss_funcs, loss_weights=loss_weights, optimizer=Adam(1e-5, 0.9), metrics=metrics)
     return gan

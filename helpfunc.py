@@ -13,6 +13,9 @@ from skimage import feature
 from canny_edge_detector import rgb2gray
 import canny_edge_detector as ced
 
+from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.applications.vgg16 import preprocess_input
+
 def perceptual_distance(y_true, y_pred):
     """Calculate perceptual distance, DO NOT ALTER"""
     norm0 = True
@@ -41,6 +44,20 @@ def perceptual_distance_np(y_true, y_pred):
     b = y_true[:, :, :, 2] - y_pred[:, :, :, 2]
 
     return np.mean(np.sqrt((((512+rmean)*r*r)/256) + 4*g*g + (((767-rmean)*b*b)/256)))
+
+vgg = VGG16(include_top=False, weights='imagenet', input_shape=(256, 256, 3))
+def custom_loss(y_true, y_pred):
+    perceptual_loss = perceptual_distance(y_true, y_pred)
+
+    y_true = preprocess_input(denormalize(y_true, True))
+    y_pred = preprocess_input(denormalize(y_pred, True))
+    #
+    y_true = vgg(y_true)
+    y_pred = vgg(y_pred)
+    vgg_loss = K.mean(K.square(y_pred - y_true))
+
+    return perceptual_loss + 1.0/5.0 * vgg_loss
+
 
 # _phase_shift and PS from https://github.com/tetrachrome/subpixel/blob/master/subpixel.py
 def _phase_shift(I, r):
@@ -205,8 +222,6 @@ class ImageLogger(Callback):
         img_pred_con_pil = Image.fromarray(np.clip(img_pred_con, 0, 255).astype("uint8"), mode='RGB')
         img_train_con_pil = Image.fromarray(np.clip(img_train_con, 0, 255).astype("uint8"), mode='RGB')
         img_learn_con_pil = Image.fromarray(np.clip(img_learn_con, 0, 255).astype("uint8"), mode='RGB')
-        np.savetxt("debug_rec.txt", img_pred_con[:,:,0], fmt='%.2f')
-
 
         # # Test debug
         # weights_att, bias_att = attention.layers[-1].get_weights()
@@ -255,64 +270,3 @@ class ImageLogger(Callback):
         ,   "train":   [wandb.Image(img_train_con_pil)]
         ,   "learn":   [wandb.Image(img_learn_con_pil)]
         }, commit=False)
-
-class ImageLoggerCanny(Callback):
-    def __init__(self, config):
-        self.config = config
-    def on_epoch_end(self, epoch, logs):
-        config = self.config
-        hr_img, edge_soft = next(image_generator_canny(5, config.val_dir, config))
-        preds = self.model.predict(hr_img)
-
-        # Output log formatting
-        out = np.concatenate([hr_img[i] for i in range(5)])
-        canny = np.concatenate([preds[i] for i in range(5)])
-        canny_soft = np.concatenate([edge_soft[i] for i in range(5)])
-
-        wandb.log({
-             "hr": [wandb.Image(out)]
-        ,    "canny": [wandb.Image(canny)]
-        ,    "canny_soft": [wandb.Image(canny_soft)]
-        }, commit=False)
-
-def image_generator_canny(batch_size, img_dir, config):
-    """A generator that returns small images and large images.  DO NOT ALTER the validation set"""
-    input_filenames = glob.glob(img_dir + "/*-out.jpg")
-    counter = 0
-    random.shuffle(input_filenames)
-    while True:
-
-        hr_img = np.zeros(
-            (batch_size, config.output_width, config.output_height, 3))
-        edge_soft = np.zeros(
-            (batch_size, config.output_width, config.output_height, 1))
-        edge_soft_gray = np.zeros(
-            (batch_size, config.output_width, config.output_height, 1))
-        if counter+batch_size >= len(input_filenames):
-            counter = 0
-        for i in range(batch_size):
-            img = input_filenames[counter + i]
-            hr_img[i] = np.array(Image.open(img))
-            edge_soft_gray[i] = rgb2gray(hr_img[i])
-
-        detector = ced.cannyEdgeDetector(edge_soft_gray, sigma=1.4, kernel_size=5, lowthreshold=0.09, highthreshold=0.17, weak_pixel=100)
-        edge_soft_list = detector.detect()
-
-        for i in range(batch_size):
-            edge_soft[i] = edge_soft_list[i]
-
-        if counter == 0 and img_dir == config.train_dir:
-            out = np.concatenate([hr_img[i] for i in range(5)])
-            canny = np.concatenate([edge_soft[i] for i in range(5)])
-
-            wandb.log({
-                 "hr": [wandb.Image(out)]
-            ,    "canny": [wandb.Image(canny)]
-            }, commit=False)
-
-        hr_img    = normalize(hr_img   , config.norm0)
-        edge_soft = normalize(edge_soft, config.norm0)
-
-
-        yield (hr_img, edge_soft)
-        counter += batch_size

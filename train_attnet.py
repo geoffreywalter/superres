@@ -8,15 +8,16 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model, load_model
 from tensorflow.keras import layers
-from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dot, Multiply, Concatenate, Reshape
+from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dot, Multiply, Concatenate, Reshape, Cropping2D
 from tensorflow.keras import backend as K
 from tensorflow.keras.callbacks import Callback, EarlyStopping, LambdaCallback, ModelCheckpoint
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.optimizers import Adam
 import wandb
 from wandb.keras import WandbCallback
-from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator, ImageLogger
+from helpfunc import PS, perceptual_distance, perceptual_distance_np, image_generator, ImageLogger, custom_loss
 from models import EDSR, SRDenseNet, Attention
+
 from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.applications.vgg16 import preprocess_input
 
@@ -37,8 +38,8 @@ config.output_width = 256
 config.norm0 = True
 config.name = "AttNet"
 config.reconstructionNN = "EDSR"
-config.filters = 160
-config.nBlocks = 32
+config.filters = 128
+config.nBlocks = 16
 config.custom_aug = False
 config.Att_filters = 16
 config.Att_nBlocks = 10
@@ -63,6 +64,7 @@ def create_attention():
     model = Model(inputs=input, outputs=Attention(input, config.Att_filters, config.Att_nBlocks, config.Att_nLayers))
     return model
 
+
 def create_merge(reconstruction, attention):
     input = Input(shape=(32, 32, 3))
     bicubic = Lambda(lambda x: tf.image.resize_bicubic(x, (256, 256), align_corners=True)) (input)
@@ -70,19 +72,22 @@ def create_merge(reconstruction, attention):
     reconstruction_out = reconstruction(input)
     attention_out = attention(input)
 
-    # vgg = VGG16(include_top=False, weights='imagenet', input_tensor=bicubic, input_shape=(256, 256, 3))
-    # for layer in vgg.layers:
-    #     layer.trainable = False
-    # x = vgg.output
-
     out1 = Lambda(lambda x: x[0] * x[1])([reconstruction_out, attention_out])
 
     out2 = Add() ([out1, bicubic])
     #out3 = Lambda(lambda x: K.clip(x, 0.0, 1.0)) (out2)
+    # pre_in = Cropping2D(cropping=224) (out2)
+    # pre_in = Lambda(lambda x: denormalize(x, config.norm0))(pre_in)
+    # pre_in = Lambda(lambda x: preprocess_input(x))(pre_in)
+    # #vgg = VGG16(include_top=False, weights='imagenet', input_shape=(256, 256, 3))
+    # vgg = VGG16(weights='imagenet')
+    # for l in vgg.layers:
+    #     l.trainable = False
+    # vgg.trainable = False
 
     model = Model(inputs=input, outputs=out2)
-    adam = Adam(epsilon=1)#, lr=0.001)#, decay=(1/2)**(1.0/100.0))
-    model.compile(optimizer=adam, loss=[perceptual_distance], metrics=[perceptual_distance])
+    adam = Adam(epsilon=0.1)#, lr=0.001)#, decay=(1/2)**(1.0/100.0))
+    model.compile(optimizer=adam, loss=custom_loss, metrics=[perceptual_distance])
     return model
 
 # Neural network
@@ -97,7 +102,7 @@ model = create_merge(reconstruction, attention)
 print(model.summary())
 print("^^^ model ^^^")
 
-model.load_weights('attnet_258.h5')
+model.load_weights('attnet_266.h5')
 
 mc = ModelCheckpoint('attnet.h5', monitor='val_perceptual_distance', mode='min', save_best_only=True)
 
