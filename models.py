@@ -2,7 +2,7 @@ from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras import layers
 from tensorflow.keras.layers import Conv2D, Input, Activation, Lambda, BatchNormalization, Add, Dense, Flatten, LeakyReLU, Concatenate, GaussianNoise, Lambda, MaxPooling2D, AveragePooling2D, Conv2DTranspose
 from tensorflow.keras.optimizers import Adam
-from helpfunc import PS, perceptual_distance
+from helpfunc import PS, perceptual_distance, custom_loss
 from canny_edge_detector import rgb2gray
 import canny_edge_detector as ced
 import tensorflow as tf
@@ -215,7 +215,7 @@ def create_gan(generator, discriminator):
     x = generator(gan_input)
     gan_output= discriminator(x)
     gan = Model(inputs=gan_input, outputs=[x, gan_output], name="gan")
-    loss_funcs = {"generator":'mae', "discriminator":'binary_crossentropy'}
+    loss_funcs = {"generator": custom_loss, "discriminator":'binary_crossentropy'}
     loss_weights = {"generator":1., "discriminator":1e-3}
     metrics = {"generator":perceptual_distance}
     gan.compile(loss=loss_funcs, loss_weights=loss_weights, optimizer=Adam(1e-5, 0.9), metrics=metrics)

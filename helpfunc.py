@@ -160,13 +160,13 @@ def image_generator(batch_size, img_dir, config, shuffle=True, augment=True):
                 # totalerr += err
             # print("===Resizing difference=" + str(totalerr/config.batch_size))
 
-            if counter == 0:
-                augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(5)]
-                augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
-                #np.savetxt("debug_aug.txt", augment_con[:,:,0], fmt='%.2f')
-                wandb.log({
-                    "augment": [wandb.Image(augment_con)]
-                }, commit=False)
+            # if counter == 0:
+            #     augment = [np.concatenate([large_images[i], denormalize(large_images_augmented[i], config.norm0)], axis=1) for i in range(5)]
+            #     augment_con = np.transpose(np.concatenate(augment), axes=(0, 1, 2))
+            #     #np.savetxt("debug_aug.txt", augment_con[:,:,0], fmt='%.2f')
+            #     wandb.log({
+            #         "augment": [wandb.Image(augment_con)]
+            #     }, commit=False)
 
             yield (small_images_augmented, large_images_augmented)
         else:

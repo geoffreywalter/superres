@@ -34,12 +34,9 @@ config.output_width = 256
 config.norm0 = True
 config.name = "GAN"
 config.reconstructionNN = "EDSR"
-config.filters = 128
-config.nBlocks = 16
+config.filters = 192
+config.nBlocks = 32
 config.custom_aug = False
-config.Att_filters = 16
-config.Att_nBlocks = 10
-config.Att_nLayers = 8
 
 config.val_dir = 'data/test'
 config.train_dir = 'data/train'
@@ -54,36 +51,21 @@ if not os.path.exists("data"):
     subprocess.check_output(
         "mkdir data && curl https://storage.googleapis.com/wandb/flower-enhance.tar.gz | tar xz -C data", shell=True)
 
-def create_reconstruction():
+def create_edsr():
     input = Input(shape=(32, 32, 3))
     model = Model(inputs=input, outputs=EDSR(input, config.filters, config.nBlocks))
     return model
 
-def create_attention():
-    input = Input(shape=(32, 32, 3))
-    model = Model(inputs=input, outputs=Attention(input, config.Att_filters, config.Att_nBlocks, config.Att_nLayers))
-    return model
-
-def create_merge(reconstruction, attention):
+def create_gen():
     input = Input(shape=(32, 32, 3))
     bicubic = Lambda(lambda x: tf.image.resize_bicubic(x, (256, 256), align_corners=True)) (input)
 
-    reconstruction_out = reconstruction(input)
-    #attention_out = attention(input)
-
-    # out1 = Lambda(lambda x: x[0] * x[1])([reconstruction_out, attention_out])
-    # out2 = Add() ([out1, bicubic])
-
-    out2 = Add() ([reconstruction_out, bicubic])
+    edsr = create_edsr()(input)
+    out2 = Add() ([edsr, bicubic])
     model = Model(inputs=input, outputs=out2, name="generator")
     # adam = Adam(epsilon=0.1)#, lr=0.001)#, decay=(1/2)**(1.0/100.0))
     #model.compile(optimizer='adam', loss='mse', metrics=[perceptual_distance])
     return model
-
-# Neural network
-reconstruction = create_reconstruction()
-attention = create_attention()
-merge = create_merge(reconstruction, attention)
 
 #model.load_weights('attnet_266.h5')
 
@@ -166,7 +148,7 @@ def train_generator(generator, discriminator, joint_model):
     # generator.save(path.join(wandb.run.dir, "generator.h5"))
 
 def sample_images(generator, i):
-    if i%100==99:
+    if i%100==0:
         generator.save_weights("generator.h5")
         # To see learning evolution on a test image
         img_lr = np.zeros((5, config.input_width, config.input_height, 3))
@@ -187,26 +169,28 @@ def sample_images(generator, i):
     #perceptual_distance
     #if (i%400 == 1):
         perc = 0
-        for n in range(config.steps_per_epoch):
+        for n in range(config.val_steps_per_epoch):
             in_sample_images, out_sample_images = next(image_generator(config.batch_size, config.val_dir, config))
             preds = generator.predict(in_sample_images)
             perc += perceptual_distance_np(out_sample_images, preds)
 
             #print("Perceptual_distance=" + str(perc))
             #wandb.log({"perceptual_distance": str(perc)}, commit=False)
-        print("Perceptual_distance=" + str(perc/config.steps_per_epoch))
-        wandb.log({'val_perceptual_distance': perc/config.steps_per_epoch
-        , 'epoch': int(i/100.0)
+        print("Perceptual_distance=" + str(perc/config.val_steps_per_epoch))
+        epoch = i//100
+        print("epoch" + str(epoch))
+        wandb.log({'val_perceptual_distance': perc/config.val_steps_per_epoch
+        , 'epoch': epoch
         }, commit=True)
 
 
 def train():
     #init
     discriminator = create_discriminator()
-    generator     = merge
+    generator     = create_gen()
     #generator.load_weights('srresnet.h5')
     joint_model   = create_gan(generator, discriminator)
-    joint_model.load_weights('srgan.h5')
+    joint_model.load_weights('srgan_best.h5')
     #generator.summary()
     #discriminator.summary()
 
@@ -222,7 +206,7 @@ def train():
         for j in range(config.generator_epochs):
             train_generator(generator, discriminator, joint_model)
 
-        joint_model.save_weights('srgan.h5')
         sample_images(generator, i)
+        # joint_model.save_weights('srgan.h5')
 
 train()
